@@ -1,4 +1,12 @@
-# ComfyUI Chatterbox TTS & Voice Conversion Node
+<div align="center">
+
+<h1>ComfyUI Chatterbox TTS & Voice Conversion Node</h1>
+
+<p align="center">
+  <img src="./assets/preview.png" alt="ComfyUI-KEEP Workflow Example">
+</p>
+    
+</div>
 
 Custom nodes for ComfyUI that integrate the [Resemble AI Chatterbox](https://github.com/resemble-ai/chatterbox) library for Text-to-Speech (TTS) and Voice Conversion (VC).
 
