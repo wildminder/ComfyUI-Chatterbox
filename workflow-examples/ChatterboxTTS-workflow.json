@@ -1,0 +1,347 @@
+{
+  "id": "dba002a2-22d7-4050-a716-4d7196a0d14b",
+  "revision": 0,
+  "last_node_id": 9,
+  "last_link_id": 8,
+  "nodes": [
+    {
+      "id": 6,
+      "type": "LoadAudio",
+      "pos": [
+        244.99009704589844,
+        259.1919250488281
+      ],
+      "size": [
+        274.080078125,
+        136
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.38",
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "male_petergriffin (1).wav",
+        null,
+        null
+      ]
+    },
+    {
+      "id": 5,
+      "type": "ChatterboxVC",
+      "pos": [
+        601.8795776367188,
+        259.1919250488281
+      ],
+      "size": [
+        309.7537841796875,
+        102.98497009277344
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source_audio",
+          "type": "AUDIO",
+          "link": 6
+        },
+        {
+          "name": "target_voice_audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "converted_audio",
+          "type": "AUDIO",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ChatterboxVC"
+      },
+      "widgets_values": [
+        "resembleai_default_voice",
+        "cuda"
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 3,
+      "type": "SaveAudio",
+      "pos": [
+        993.3179321289062,
+        259.1919250488281
+      ],
+      "size": [
+        270,
+        112
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 5
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.38",
+        "Node name for S&R": "SaveAudio"
+      },
+      "widgets_values": [
+        "audio/ComfyUI"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "LoadAudio",
+      "pos": [
+        247.55369567871094,
+        476.8966064453125
+      ],
+      "size": [
+        274.080078125,
+        136
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            3,
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.38",
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "male_rickmorty.mp3",
+        null,
+        null
+      ]
+    },
+    {
+      "id": 1,
+      "type": "ChatterboxTTS",
+      "pos": [
+        602.9576416015625,
+        476.8966064453125
+      ],
+      "size": [
+        314.2256164550781,
+        308.12054443359375
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio_prompt",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ChatterboxTTS"
+      },
+      "widgets_values": [
+        "resembleai_default_voice",
+        "So I want you to get up now. I want all of you to get up out of your chairs. I want you to go to the window, open it, and stick your head out and yell \"I'M MAD AS HELL, AND I'M NOT GOING TO TAKE THIS ANYMORE!\"",
+        1.0000000000000002,
+        1.0000000000000002,
+        0.5000000000000001,
+        796281196068079,
+        "randomize",
+        "cuda"
+      ],
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 7,
+      "type": "SaveAudio",
+      "pos": [
+        997.5882568359375,
+        476.8966064453125
+      ],
+      "size": [
+        270,
+        112
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 8
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.38",
+        "Node name for S&R": "SaveAudio"
+      },
+      "widgets_values": [
+        "audio/ComfyUI"
+      ]
+    },
+    {
+      "id": 8,
+      "type": "Label (rgthree)",
+      "pos": [
+        236.5893096923828,
+        112.5897445678711
+      ],
+      "size": [
+        302.32421875,
+        60
+      ],
+      "flags": {
+        "allow_interaction": true
+      },
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "Chatterbox TTS",
+      "properties": {
+        "fontSize": 40,
+        "fontFamily": "Arial",
+        "fontColor": "#ffffff",
+        "textAlign": "left",
+        "backgroundColor": "transparent",
+        "padding": 10,
+        "borderRadius": 0
+      },
+      "color": "#fff0",
+      "bgcolor": "#fff0"
+    },
+    {
+      "id": 9,
+      "type": "Note",
+      "pos": [
+        1312.27880859375,
+        258.85833740234375
+      ],
+      "size": [
+        436.8709716796875,
+        383.7874755859375
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "- Download models from:\nhttps://huggingface.co/ResembleAI/chatterbox\n\n- and place them in\nComfyUI\\models\\chatterbox_tts\\resembleai_default_voice\n\n"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [
+      3,
+      4,
+      0,
+      1,
+      0,
+      "AUDIO"
+    ],
+    [
+      5,
+      5,
+      0,
+      3,
+      0,
+      "AUDIO"
+    ],
+    [
+      6,
+      6,
+      0,
+      5,
+      0,
+      "AUDIO"
+    ],
+    [
+      7,
+      4,
+      0,
+      5,
+      1,
+      "AUDIO"
+    ],
+    [
+      8,
+      1,
+      0,
+      7,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9229599817706517,
+      "offset": [
+        -136.5893096923828,
+        -12.589744567871094
+      ]
+    },
+    "frontendVersion": "1.20.7",
+    "VHS_latentpreview": false,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}
