@@ -23,60 +23,7 @@ Custom nodes for ComfyUI that integrate the [Resemble AI Chatterbox](https://git
 
 
 ## 🎭 Chatterbox TTS Demo Samples  
-Exampler from the [official demo](https://resemble-ai.github.io/chatterbox_demopage/)
-
-**Text Prompt:**  
-_"Everybody be cool. This is a robbery. Any of you fucking pricks move and I'll execute every motherfucking last one of you."_
-
-<table class="tg">
-<thead>
-  <tr>
-    <th class="tg-0pky">Prompt</th>
-    <th class="tg-0pky">Exaggeration 0.5</th>
-    <th class="tg-0pky">Exaggeration 1.0</th>
-    <th class="tg-0pky">Exaggeration 2.0</th>
-  </tr>
-</thead>
-<tbody>
-  <tr>
-    <td class="tg-0pky"><audio class="audio-narrow" src="https://storage.googleapis.com/chatterbox-demo-samples/prompts/male_old_movie.flac" controls="" preload=""></audio></td>
-    <td class="tg-0pky"><audio src="https://storage.googleapis.com/chatterbox-demo-samples/samples/old_movie_exaggerate_0.5.wav" controls="" preload=""></audio></td>
-    <td class="tg-0pky"><audio src="https://storage.googleapis.com/chatterbox-demo-samples/samples/old_movie_exaggerate_1.0.wav" controls="" preload=""></audio></td>
-    <td class="tg-0pky"><audio src="https://storage.googleapis.com/chatterbox-demo-samples/samples/old_movie_exaggerate_2.0.wav" controls="" preload=""></audio></td>
-  </tr>
-   <tr>
-    <td class="tg-0pky"><audio class="audio-narrow" src="https://storage.googleapis.com/chatterbox-demo-samples/prompts/male_petergriffin.wav" controls="" preload=""></audio></td>
-    <td class="tg-0pky"><audio src="https://storage.googleapis.com/chatterbox-demo-samples/samples/peter_griffin_exag_0.5.wav" controls="" preload=""></audio></td>
-    <td class="tg-0pky"><audio src="https://storage.googleapis.com/chatterbox-demo-samples/samples/peter_griffin_exag_1.0.wav" controls="" preload=""></audio></td>
-    <td class="tg-0pky"><audio src="https://storage.googleapis.com/chatterbox-demo-samples/samples/peter_griffin_exag_2.0.wav" controls="" preload=""></audio></td>
-  </tr>
-</tbody>
-</table>
-<hr />
-
-
-**Text Prompt:**  
-_"My name is Maximus Decimus Meridius, commander of the Armies of the North, General of the Felix Legions and loyal servant to the true emperor, Marcus Aurelius.  
-Father to a murdered son, husband to a murdered wife. And I will have my vengeance, in this life or the next."_
-
-<table class="tg">
-<thead>
-  <tr>
-    <th class="tg-0pky">Prompt</th>
-    <th class="tg-0pky">Output</th>
-  </tr>
-</thead>
-<tbody>
-   <tr>
-    <td class="tg-0pky"><audio class="audio-narrow" src="https://storage.googleapis.com/chatterbox-demo-samples/prompts/male_rickmorty.mp3" controls="" preload=""></audio></td>
-    <td class="tg-0pky"><audio src="https://storage.googleapis.com/chatterbox-demo-samples/samples/gladiator_rick.wav" controls="" preload=""></audio></td>
-  </tr>
-  <tr>
-    <td class="tg-0pky"><audio class="audio-narrow" src="https://storage.googleapis.com/chatterbox-demo-samples/prompts/male_old_movie.flac" controls="" preload=""></audio></td>
-    <td class="tg-0pky"><audio src="https://storage.googleapis.com/chatterbox-demo-samples/samples/gladiator_old_movie.wav" controls="" preload=""></audio></td>
-  </tr>
-</tbody>
-</table>
+Check the [official demo](https://resemble-ai.github.io/chatterbox_demopage/)
 
 ## Installation
 
