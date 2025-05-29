@@ -1,5 +1,5 @@
 [project]
-name = "ComfyUI-Chatterbox"
+name = "ComfyUI-ChatterboxTTS"
 description = "ComfyUI Chatterbox TTS & Voice Conversion Node"
 version = "1.0.1"
 license = {file = "LICENSE"}
@@ -11,5 +11,5 @@ Repository = "https://github.com/wildminder/ComfyUI-Chatterbox"
 
 [tool.comfy]
 PublisherId = "wildai"
-DisplayName = "ComfyUI-Chatterbox"
+DisplayName = "ComfyUI-ChatterboxTTS"
 Icon = ""
