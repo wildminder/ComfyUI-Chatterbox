@@ -57,10 +57,9 @@ Load example workflows from the `workflow-examples/` directory in this repositor
 
 ## Notes
 
-*   The Chatterbox library is vendored (included) within this custom node's `src/` directory.
+*   The Chatterbox library is included within this custom node's `src/` directory.
 
 
 ## Acknowledgements
 
 *   This node relies on the [Chatterbox](https://github.com/resemble-ai/chatterbox) library by Resemble AI.
-*   Inspiration for auto-downloading and node structure from the ComfyUI ecosystem.
