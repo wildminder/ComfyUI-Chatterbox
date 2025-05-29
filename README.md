@@ -10,7 +10,7 @@
 
 Custom nodes for ComfyUI that integrate the [Resemble AI Chatterbox](https://github.com/resemble-ai/chatterbox) library for Text-to-Speech (TTS) and Voice Conversion (VC).
 
-## Features
+## 📢 Features
 
 *   **Chatterbox TTS Node:**
     *   Synthesize speech from text.
@@ -62,7 +62,7 @@ Load example workflows from the `workflow-examples/` directory in this repositor
 ## Notes
 
 *   The Chatterbox library is included within this custom node's `src/` directory.
-
+*   Tested with Pytorch 2.7 + CUDA 12.6
 
 ## Acknowledgements
 
