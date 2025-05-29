@@ -1,0 +1,12 @@
+torch
+torchaudio
+librosa
+numpy
+huggingface_hub
+resemble-perth
+einops
+scipy
+tokenizers
+soundfile
+s3tokenizer
+conformer
