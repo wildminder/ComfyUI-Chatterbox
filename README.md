@@ -26,6 +26,7 @@ Custom nodes for ComfyUI that integrate the [Resemble AI Chatterbox](https://git
 Check the [official demo](https://resemble-ai.github.io/chatterbox_demopage/)
 
 ## Installation
+Via ComfyUI Manager [ComfyUI-ChatterboxTTS](https://registry.comfy.org/publishers/wildai/nodes/ComfyUI-ChatterboxTTS) or by cloning the repo:
 
 1.  **Clone this repository:**
     ```bash
