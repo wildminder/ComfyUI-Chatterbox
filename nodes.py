@@ -7,9 +7,12 @@ import numpy as np
 
 from .modules.chatterbox_handler import (
     get_chatterbox_model_pack_names,
-    get_cached_chatterbox_tts_model,
-    get_cached_chatterbox_vc_model,
+    get_cached_chatterbox_tts_model_with_fallback,
+    get_cached_chatterbox_vc_model_with_fallback,
     set_chatterbox_seed,
+    unload_chatterbox_tts_model,
+    unload_chatterbox_vc_model,
+    clear_gpu_cache,
     CHATTERBOX_MODEL_SUBDIR,
     DEFAULT_MODEL_PACK_NAME
 )
@@ -34,6 +37,7 @@ class ChatterboxTTSNode:
             },
             "optional": {
                 "audio_prompt": ("AUDIO",),
+                "keep_model_loaded": ("BOOLEAN", {"default": False}),
             }
         }
 
@@ -43,7 +47,7 @@ class ChatterboxTTSNode:
     CATEGORY = "audio/generation"
     OUTPUT_NODE = True 
 
-    def synthesize(self, model_pack_name, text, exaggeration, temperature, cfg_weight, seed, device, audio_prompt=None):
+    def synthesize(self, model_pack_name, text, exaggeration, temperature, cfg_weight, seed, device, audio_prompt=None, keep_model_loaded=False):
         if not text.strip():
             #print("Chatterbox TTS: Empty text provided, returning silent audio.")
             dummy_sr = 24000 
@@ -51,7 +55,7 @@ class ChatterboxTTSNode:
             return ({"waveform": silent_waveform.unsqueeze(0), "sample_rate": dummy_sr},)
 
         try:
-            chatterbox_model = get_cached_chatterbox_tts_model(model_pack_name, device_str=device)
+            chatterbox_model = get_cached_chatterbox_tts_model_with_fallback(model_pack_name, device_str=device, keep_model_loaded=keep_model_loaded)
         except Exception as e:
             print(f"ChatterboxTTS: Error loading/downloading TTS model pack '{model_pack_name}': {e}")
             dummy_sr = 24000
@@ -105,6 +109,10 @@ class ChatterboxTTSNode:
                     os.remove(audio_prompt_path_temp)
                 except Exception as e:
                     print(f"ChatterboxTTS: Error removing temp audio prompt file {audio_prompt_path_temp}: {e}")
+            
+            # Unload model if keep_model_loaded is False
+            if not keep_model_loaded:
+                unload_chatterbox_tts_model(model_pack_name, device_str=device)
         
         wav_tensor_comfy = wav_tensor_chatterbox.cpu().unsqueeze(0) 
         return ({"waveform": wav_tensor_comfy, "sample_rate": chatterbox_model.sr},)
@@ -126,6 +134,7 @@ class ChatterboxVCNode:
             },
             "optional": {
                 "target_voice_audio": ("AUDIO",), # Optional: if not provided, uses default voice from conds.pt
+                "keep_model_loaded": ("BOOLEAN", {"default": False}),
             }
         }
 
@@ -171,7 +180,7 @@ class ChatterboxVCNode:
                 os.remove(temp_file_path)
             return None
 
-    def convert_voice(self, model_pack_name, source_audio, device, target_voice_audio=None):
+    def convert_voice(self, model_pack_name, source_audio, device, target_voice_audio=None, keep_model_loaded=False):
         if source_audio is None or source_audio.get("waveform") is None or source_audio["waveform"].numel() == 0:
             print("ChatterboxVC: No source audio provided, returning silent audio.")
             dummy_sr = 24000
@@ -179,7 +188,7 @@ class ChatterboxVCNode:
             return ({"waveform": silent_waveform.unsqueeze(0), "sample_rate": dummy_sr},)
 
         try:
-            vc_model = get_cached_chatterbox_vc_model(model_pack_name, device_str=device)
+            vc_model = get_cached_chatterbox_vc_model_with_fallback(model_pack_name, device_str=device, keep_model_loaded=keep_model_loaded)
         except Exception as e:
             print(f"ChatterboxVC: Error loading/downloading VC model pack '{model_pack_name}': {e}")
             dummy_sr = 24000
@@ -224,6 +233,10 @@ class ChatterboxVCNode:
                     os.remove(target_voice_path_temp)
                 except Exception as e:
                     print(f"ChatterboxVC: Error removing temp target audio file {target_voice_path_temp}: {e}")
+            
+            # Unload model if keep_model_loaded is False
+            if not keep_model_loaded:
+                unload_chatterbox_vc_model(model_pack_name, device_str=device)
         
         # ComfyUI AUDIO format: {"waveform": tensor (B, C, T), "sample_rate": int}
         # ChatterboxVC output: tensor (1, T)

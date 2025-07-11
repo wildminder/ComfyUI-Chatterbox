@@ -24,6 +24,44 @@ CHATTERBOX_REPO_ID = "ResembleAI/chatterbox"
 CHATTERBOX_FILES_TO_DOWNLOAD = ["ve.pt", "t3_cfg.pt", "s3gen.pt", "tokenizer.json", "conds.pt"]
 DEFAULT_MODEL_PACK_NAME = "resembleai_default_voice"
 
+def clear_gpu_cache():
+    """Clear GPU cache for all available devices."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
+
+def unload_chatterbox_tts_model(model_pack_name, device_str="cuda"):
+    """Unloads a specific TTS model from cache."""
+    cache_key = (model_pack_name, device_str, "tts")
+    if cache_key in TTS_MODEL_CACHE:
+        print(f"ChatterboxTTS: Unloading TTS model '{model_pack_name}' from '{device_str}' cache.")
+        del TTS_MODEL_CACHE[cache_key]
+        clear_gpu_cache()
+        return True
+    return False
+
+def unload_chatterbox_vc_model(model_pack_name, device_str="cuda"):
+    """Unloads a specific VC model from cache."""
+    cache_key = (model_pack_name, device_str, "vc")
+    if cache_key in VC_MODEL_CACHE:
+        print(f"ChatterboxVC: Unloading VC model '{model_pack_name}' from '{device_str}' cache.")
+        del VC_MODEL_CACHE[cache_key]
+        clear_gpu_cache()
+        return True
+    return False
+
+def unload_all_chatterbox_models():
+    """Unloads all cached Chatterbox models."""
+    tts_count = len(TTS_MODEL_CACHE)
+    vc_count = len(VC_MODEL_CACHE)
+    
+    TTS_MODEL_CACHE.clear()
+    VC_MODEL_CACHE.clear()
+    clear_gpu_cache()
+    
+    print(f"ChatterboxTTS/VC: Unloaded {tts_count} TTS models and {vc_count} VC models from cache.")
+
 def get_chatterbox_model_pack_names():
     """Returns a list of available Chatterbox model pack names (subdirectories)."""
     chatterbox_models_base_path = os.path.join(folder_paths.models_dir, CHATTERBOX_MODEL_SUBDIR)
@@ -115,7 +153,7 @@ def load_chatterbox_tts_model(model_pack_name, device_str="cuda"):
         raise
     return model
 
-def get_cached_chatterbox_tts_model(model_pack_name, device_str="cuda"):
+def get_cached_chatterbox_tts_model(model_pack_name, device_str="cuda", keep_model_loaded=True):
     """Loads and caches the ChatterboxTTS model."""
     if not model_pack_name:
         available_packs = get_chatterbox_model_pack_names()
@@ -140,8 +178,30 @@ def get_cached_chatterbox_tts_model(model_pack_name, device_str="cuda"):
         else:
             print(f"ChatterboxTTS: TTS Model for '{model_pack_name}' on '{device_str}' not in cache. Loading...")
         
-        TTS_MODEL_CACHE[cache_key] = load_chatterbox_tts_model(model_pack_name, device_str)
-        return TTS_MODEL_CACHE[cache_key]
+        model = load_chatterbox_tts_model(model_pack_name, device_str)
+        
+        # Only cache the model if keep_model_loaded is True
+        if keep_model_loaded:
+            TTS_MODEL_CACHE[cache_key] = model
+            print(f"ChatterboxTTS: Model '{model_pack_name}' cached for reuse.")
+        else:
+            print(f"ChatterboxTTS: Model '{model_pack_name}' loaded but not cached (keep_model_loaded=False).")
+        
+        return model
+
+def get_cached_chatterbox_tts_model_with_fallback(model_pack_name, device_str="cuda", keep_model_loaded=True):
+    """Loads and caches the ChatterboxTTS model with automatic fallback to CPU on GPU errors."""
+    try:
+        return get_cached_chatterbox_tts_model(model_pack_name, device_str, keep_model_loaded)
+    except RuntimeError as e:
+        error_str = str(e)
+        if ("CUDA" in error_str or "MPS" in error_str) and device_str != "cpu":
+            print(f"ChatterboxTTS: GPU error detected, falling back to CPU: {e}")
+            # Unload any existing model on the failed device
+            unload_chatterbox_tts_model(model_pack_name, device_str)
+            return get_cached_chatterbox_tts_model(model_pack_name, "cpu", keep_model_loaded)
+        else:
+            raise
 
 
 def load_chatterbox_vc_model(model_pack_name, device_str="cuda"):
@@ -174,7 +234,7 @@ def load_chatterbox_vc_model(model_pack_name, device_str="cuda"):
         raise
     return model
 
-def get_cached_chatterbox_vc_model(model_pack_name, device_str="cuda"):
+def get_cached_chatterbox_vc_model(model_pack_name, device_str="cuda", keep_model_loaded=True):
     """Loads and caches the ChatterboxVC model."""
     if not model_pack_name:
         available_packs = get_chatterbox_model_pack_names()
@@ -198,8 +258,31 @@ def get_cached_chatterbox_vc_model(model_pack_name, device_str="cuda"):
             print(f"ChatterboxVC: Device mismatch for cached VC model '{model_pack_name}'. Reloading.")
         else:
             print(f"ChatterboxVC: VC Model for '{model_pack_name}' on '{device_str}' not in cache. Loading...")
-        VC_MODEL_CACHE[cache_key] = load_chatterbox_vc_model(model_pack_name, device_str)
-        return VC_MODEL_CACHE[cache_key]
+        
+        model = load_chatterbox_vc_model(model_pack_name, device_str)
+        
+        # Only cache the model if keep_model_loaded is True
+        if keep_model_loaded:
+            VC_MODEL_CACHE[cache_key] = model
+            print(f"ChatterboxVC: Model '{model_pack_name}' cached for reuse.")
+        else:
+            print(f"ChatterboxVC: Model '{model_pack_name}' loaded but not cached (keep_model_loaded=False).")
+        
+        return model
+
+def get_cached_chatterbox_vc_model_with_fallback(model_pack_name, device_str="cuda", keep_model_loaded=True):
+    """Loads and caches the ChatterboxVC model with automatic fallback to CPU on GPU errors."""
+    try:
+        return get_cached_chatterbox_vc_model(model_pack_name, device_str, keep_model_loaded)
+    except RuntimeError as e:
+        error_str = str(e)
+        if ("CUDA" in error_str or "MPS" in error_str) and device_str != "cpu":
+            print(f"ChatterboxVC: GPU error detected, falling back to CPU: {e}")
+            # Unload any existing model on the failed device
+            unload_chatterbox_vc_model(model_pack_name, device_str)
+            return get_cached_chatterbox_vc_model(model_pack_name, "cpu", keep_model_loaded)
+        else:
+            raise
 
 
 def set_chatterbox_seed(seed: int):
