@@ -1,9 +1,9 @@
 [project]
 name = "ComfyUI-ChatterboxTTS"
 description = "ComfyUI Chatterbox TTS & Voice Conversion Node"
-version = "1.0.1"
+version = "1.2.0"
 license = {file = "LICENSE"}
-dependencies = ["torch", "torchaudio", "librosa", "numpy", "huggingface_hub", "resemble-perth", "einops", "scipy", "tokenizers", "soundfile", "s3tokenizer", "tqdm", "conformer"]
+dependencies = ["torch", "torchaudio", "librosa", "numpy", "huggingface_hub", "einops", "scipy", "tokenizers", "soundfile", "s3tokenizer", "tqdm", "conformer", "safetensors", "transformers", "diffusers"]
 
 [project.urls]
 Repository = "https://github.com/wildminder/ComfyUI-Chatterbox"
