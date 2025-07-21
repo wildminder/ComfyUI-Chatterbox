@@ -66,7 +66,7 @@ ComfyUI custom nodes for the powerful [Resemble AI Chatterbox](https://github.co
 ### Major Update Notice
 
 > [!NOTE]
-> This version of ComfyUI-Chatterbox has been deeply refactored for better performance, stability, and alignment with ComfyUI codebase. Key improvements include:
+> This version of ComfyUI-Chatterbox has been deeply refactored for better performance, stability, and alignment with ComfyUI codebase
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
