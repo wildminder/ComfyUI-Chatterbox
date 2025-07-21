@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
 from transformers import LlamaModel, LlamaConfig
-from transformers.generation.logits_process import TopPLogitsWarper, RepetitionPenaltyLogitsProcessor
+from transformers.generation.logits_process import MinPLogitsWarper, RepetitionPenaltyLogitsProcessor, TopPLogitsWarper
 
 from .modules.learned_pos_emb import LearnedPositionEmbeddings
 
@@ -16,16 +16,10 @@ from .modules.cond_enc import T3CondEnc, T3Cond
 from .modules.t3_config import T3Config
 from .llama_configs import LLAMA_CONFIGS
 from .inference.t3_hf_backend import T3HuggingfaceBackend
-from .inference.alignment_stream_analyzer import AlignmentStreamAnalyzer
+from ..utils import AttrDict
 
 
 logger = logging.getLogger(__name__)
-
-
-class AttrDict(dict):
-    def __init__(self, *args, **kwargs):
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
 
 
 def _ensure_BOT_EOT(text_tokens: Tensor, hp):
@@ -89,11 +83,13 @@ class T3(nn.Module):
         t3_cond: T3Cond,
         text_tokens: torch.LongTensor,
         speech_tokens: torch.LongTensor,
+        cfg_weight: float = 0.0,
     ):
         # prepare input embeddings (skip backbone tranformer embeddings)
         cond_emb = self.prepare_conditioning(t3_cond)  # (B, len_cond, dim)
         text_emb = self.text_emb(text_tokens)  # (B, len_text, dim)
-        text_emb[1].zero_()  # CFG uncond
+        if cfg_weight > 0.0:
+            text_emb[1].zero_()  # CFG uncond
 
         speech_emb = self.speech_emb(speech_tokens)  # (B, len_speech, dim)
         if self.hp.input_pos_emb == "learned":
@@ -217,14 +213,16 @@ class T3(nn.Module):
 
         # HF generate args
         num_return_sequences=1,
-        max_new_tokens=None,
+        max_new_tokens,
         stop_on_eos=True,
         do_sample=True,
         temperature=0.8,
-        top_p=0.8,
+        min_p=0.05,
+        top_p=1.0,
         length_penalty=1.0,
-        repetition_penalty=2.0,
+        repetition_penalty=1.2,
         cfg_weight=0,
+        pbar=None
     ):
         """
         Args:
@@ -235,6 +233,9 @@ class T3(nn.Module):
         _ensure_BOT_EOT(text_tokens, self.hp)
         text_tokens = torch.atleast_2d(text_tokens).to(dtype=torch.long, device=self.device)
 
+        if max_new_tokens is None:
+            max_new_tokens = self.hp.max_speech_tokens
+	    
         # Default initial speech to a single start-of-speech token
         if initial_speech_tokens is None:
             initial_speech_tokens = self.hp.start_speech_token * torch.ones_like(text_tokens[:, :1])
@@ -244,6 +245,7 @@ class T3(nn.Module):
             t3_cond=t3_cond,
             text_tokens=text_tokens,
             speech_tokens=initial_speech_tokens,
+            cfg_weight=cfg_weight,
         )
 
         # In order to use the standard HF generate method, we need to extend some methods to inject our custom logic
@@ -254,19 +256,12 @@ class T3(nn.Module):
         # TODO? synchronize the expensive compile function
         # with self.compile_lock:
         if not self.compiled:
-            alignment_stream_analyzer = AlignmentStreamAnalyzer(
-                self.tfmr,
-                None,
-                text_tokens_slice=(len_cond, len_cond + text_tokens.size(-1)),
-                alignment_layer_idx=9, # TODO: hparam or something?
-                eos_idx=self.hp.stop_speech_token,
-            )
             patched_model = T3HuggingfaceBackend(
                 config=self.cfg,
                 llama=self.tfmr,
                 speech_enc=self.speech_emb,
                 speech_head=self.speech_head,
-                alignment_stream_analyzer=alignment_stream_analyzer,
+                alignment_stream_analyzer=None,
             )
             self.patched_model = patched_model
             self.compiled = True
@@ -281,7 +276,7 @@ class T3(nn.Module):
         #     max_new_tokens=max_new_tokens or self.hp.max_speech_tokens,
         #     num_return_sequences=num_return_sequences,
         #     temperature=temperature,
-        #     top_p=top_p,
+        #     min_p=min_p,
         #     length_penalty=length_penalty,
         #     repetition_penalty=repetition_penalty,
         #     do_sample=do_sample,
@@ -297,18 +292,22 @@ class T3(nn.Module):
         # batch_size=2 for CFG
         bos_embed = torch.cat([bos_embed, bos_embed])
 
-        # Combine condition and BOS token for the initial input
-        inputs_embeds = torch.cat([embeds, bos_embed], dim=1)
+        # Combine condition and BOS token for the initial input if cfg_weight > 0
+        if cfg_weight > 0:
+            inputs_embeds = torch.cat([embeds, bos_embed], dim=1)
+        else:
+            inputs_embeds = embeds
 
         # Track generated token ids; start with the BOS token.
         generated_ids = bos_token.clone()
         predicted = []  # To store the predicted tokens
 
         # Instantiate the logits processors.
+        min_p_warper = MinPLogitsWarper(min_p=min_p)
         top_p_warper = TopPLogitsWarper(top_p=top_p)
-        repetition_penalty_processor = RepetitionPenaltyLogitsProcessor(penalty=repetition_penalty)
+        repetition_penalty_processor = RepetitionPenaltyLogitsProcessor(penalty=float(repetition_penalty))
 
-        # ---- Initial Forward Pass (no kv_cache yet) ----
+        # Initial Forward Pass (no kv_cache yet)
         output = self.patched_model(
             inputs_embeds=inputs_embeds,
             past_key_values=None,
@@ -320,14 +319,17 @@ class T3(nn.Module):
         # Initialize kv_cache with the full context.
         past = output.past_key_values
 
-        # ---- Generation Loop using kv_cache ----
-        for i in tqdm(range(max_new_tokens), desc="Sampling", dynamic_ncols=True):
+        iterator = tqdm(range(max_new_tokens), desc="Chatterbox Sampling", dynamic_ncols=True)
+
+        for i in iterator:
             logits = output.logits[:, -1, :]
 
             # CFG
-            logits_cond = logits[0:1]
-            logits_uncond = logits[1:2]
-            logits = logits_cond + cfg_weight * (logits_cond - logits_uncond)
+            if cfg_weight > 0.0:
+                logits_cond = logits[0:1]
+                logits_uncond = logits[1:2]
+                logits = logits_cond + cfg_weight * (logits_cond - logits_uncond)
+
             logits = logits.squeeze(1)
 
             # Apply temperature scaling.
@@ -336,6 +338,7 @@ class T3(nn.Module):
 
             # Apply repetition penalty and top‑p filtering.
             logits = repetition_penalty_processor(generated_ids, logits)
+            logits = min_p_warper(None, logits)
             logits = top_p_warper(None, logits)
 
             # Convert logits to probabilities and sample the next token.
@@ -345,8 +348,7 @@ class T3(nn.Module):
             predicted.append(next_token)
             generated_ids = torch.cat([generated_ids, next_token], dim=1)
 
-            # Check for EOS token.
-            if next_token.view(-1) == self.hp.stop_speech_token:
+            if stop_on_eos and next_token.view(-1) == self.hp.stop_speech_token:
                 break
 
             # Get embedding for the new token.
@@ -354,7 +356,8 @@ class T3(nn.Module):
             next_token_embed = next_token_embed + self.speech_pos_emb.get_fixed_embedding(i + 1)
 
             #  For CFG
-            next_token_embed = torch.cat([next_token_embed, next_token_embed])
+            if cfg_weight > 0.0:
+                next_token_embed = torch.cat([next_token_embed, next_token_embed])
 
             # Forward pass with only the new token and the cached past.
             output = self.patched_model(
@@ -367,6 +370,9 @@ class T3(nn.Module):
             # Update the kv_cache.
             past = output.past_key_values
 
+            if pbar:
+                pbar.update(1)
+		
         # Concatenate all predicted tokens along the sequence dimension.
         predicted_tokens = torch.cat(predicted, dim=1)  # shape: (B, num_tokens)
         return predicted_tokens

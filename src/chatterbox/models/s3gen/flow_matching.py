@@ -14,18 +14,9 @@
 import threading
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 from .matcha.flow_matching import BASECFM
-from omegaconf import OmegaConf
-
-
-CFM_PARAMS = OmegaConf.create({
-    "sigma_min": 1e-06,
-    "solver": "euler",
-    "t_scheduler": "cosine",
-    "training_cfg_rate": 0.2,
-    "inference_cfg_rate": 0.7,
-    "reg_loss_type": "l1"
-})
+from .configs import CFM_PARAMS
 
 
 class ConditionalCFM(BASECFM):
@@ -45,7 +36,7 @@ class ConditionalCFM(BASECFM):
         self.lock = threading.Lock()
 
     @torch.inference_mode()
-    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, prompt_len=0, flow_cache=torch.zeros(1, 80, 0, 2)):
+    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, prompt_len=0, flow_cache=torch.zeros(1, 80, 0, 2), pbar=None, flow_cfg_scale=None):
         """Forward diffusion
 
         Args:
@@ -58,11 +49,15 @@ class ConditionalCFM(BASECFM):
             spks (torch.Tensor, optional): speaker ids. Defaults to None.
                 shape: (batch_size, spk_emb_dim)
             cond: Not used but kept for future purposes
+            pbar: ComfyUI ProgressBar instance
 
         Returns:
             sample: generated mel-spectrogram
                 shape: (batch_size, n_feats, mel_timesteps)
         """
+        
+        if flow_cfg_scale is not None:
+            self.inference_cfg_rate = flow_cfg_scale
 
         z = torch.randn_like(mu).to(mu.device).to(mu.dtype) * temperature
         cache_size = flow_cache.shape[2]
@@ -77,9 +72,10 @@ class ConditionalCFM(BASECFM):
         t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device, dtype=mu.dtype)
         if self.t_scheduler == 'cosine':
             t_span = 1 - torch.cos(t_span * 0.5 * torch.pi)
-        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond), flow_cache
+        
+        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond, pbar=pbar), flow_cache
 
-    def solve_euler(self, x, t_span, mu, mask, spks, cond):
+    def solve_euler(self, x, t_span, mu, mask, spks, cond, pbar=None):
         """
         Fixed euler solver for ODEs.
         Args:
@@ -93,6 +89,7 @@ class ConditionalCFM(BASECFM):
             spks (torch.Tensor, optional): speaker ids. Defaults to None.
                 shape: (batch_size, spk_emb_dim)
             cond: Not used but kept for future purposes
+            pbar: ComfyUI ProgressBar instance
         """
         t, _, dt = t_span[0], t_span[-1], t_span[1] - t_span[0]
         t = t.unsqueeze(dim=0)
@@ -100,7 +97,8 @@ class ConditionalCFM(BASECFM):
         # I am storing this because I can later plot it by putting a debugger here and saving it to a file
         # Or in future might add like a return_all_steps flag
         sol = []
-
+        iterator = tqdm(range(1, len(t_span)), desc="Voice Converting", dynamic_ncols=True)
+	
         # Do not use concat, it may cause memory format changed and trt infer with wrong results!
         x_in = torch.zeros([2, 80, x.size(2)], device=x.device, dtype=x.dtype)
         mask_in = torch.zeros([2, 1, x.size(2)], device=x.device, dtype=x.dtype)
@@ -108,7 +106,7 @@ class ConditionalCFM(BASECFM):
         t_in = torch.zeros([2], device=x.device, dtype=x.dtype)
         spks_in = torch.zeros([2, 80], device=x.device, dtype=x.dtype)
         cond_in = torch.zeros([2, 80, x.size(2)], device=x.device, dtype=x.dtype)
-        for step in range(1, len(t_span)):
+        for step in iterator:
             # Classifier-Free Guidance inference introduced in VoiceBox
             x_in[:] = x
             mask_in[:] = mask
@@ -129,6 +127,9 @@ class ConditionalCFM(BASECFM):
             sol.append(x)
             if step < len(t_span) - 1:
                 dt = t_span[step + 1] - t
+            
+            if pbar:
+                pbar.update(1)
 
         return sol[-1].float()
 
@@ -201,7 +202,7 @@ class CausalConditionalCFM(ConditionalCFM):
         self.rand_noise = torch.randn([1, 80, 50 * 300])
 
     @torch.inference_mode()
-    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None):
+    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, pbar=None, flow_cfg_scale=None, **kwargs):
         """Forward diffusion
 
         Args:
@@ -220,9 +221,12 @@ class CausalConditionalCFM(ConditionalCFM):
                 shape: (batch_size, n_feats, mel_timesteps)
         """
 
+        if flow_cfg_scale is not None:
+            self.inference_cfg_rate = flow_cfg_scale
+            
         z = self.rand_noise[:, :, :mu.size(2)].to(mu.device).to(mu.dtype) * temperature
         # fix prompt and overlap part mu and z
         t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device, dtype=mu.dtype)
         if self.t_scheduler == 'cosine':
             t_span = 1 - torch.cos(t_span * 0.5 * torch.pi)
-        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond), None
+        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond, pbar=pbar), None

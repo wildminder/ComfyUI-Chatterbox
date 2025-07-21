@@ -5,7 +5,7 @@
 <br />
 <div align="center">
   <a href="https://github.com/wildminder/ComfyUI-Chatterbox">
-    <img src="./assets/preview.png" alt="Chatterbox Nodes in ComfyUI">
+    <img src="./workflow-examples/ChatterboxTTS-workflow.png" alt="Chatterbox Nodes in ComfyUI">
   </a>
 
   <h3 align="center">ComfyUI Chatterbox</h3>

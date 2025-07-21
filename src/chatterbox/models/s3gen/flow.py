@@ -14,32 +14,54 @@
 import logging
 import random
 from typing import Dict, Optional
+
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from omegaconf import DictConfig
 from .utils.mask import make_pad_mask
+from .configs import CFM_PARAMS
 
+logger = logging.getLogger(__name__)
 
 class MaskedDiffWithXvec(torch.nn.Module):
-    def __init__(self,
-                 input_size: int = 512,
-                 output_size: int = 80,
-                 spk_embed_dim: int = 192,
-                 output_type: str = "mel",
-                 vocab_size: int = 4096,
-                 input_frame_rate: int = 50,
-                 only_mask_loss: bool = True,
-                 encoder: torch.nn.Module = None,
-                 length_regulator: torch.nn.Module = None,
-                 decoder: torch.nn.Module = None,
-                 decoder_conf: Dict = {'in_channels': 240, 'out_channel': 80, 'spk_emb_dim': 80, 'n_spks': 1,
-                                       'cfm_params': DictConfig({'sigma_min': 1e-06, 'solver': 'euler', 't_scheduler': 'cosine',
-                                                                 'training_cfg_rate': 0.2, 'inference_cfg_rate': 0.7, 'reg_loss_type': 'l1'}),
-                                       'decoder_params': {'channels': [256, 256], 'dropout': 0.0, 'attention_head_dim': 64,
-                                                          'n_blocks': 4, 'num_mid_blocks': 12, 'num_heads': 8, 'act_fn': 'gelu'}},
-                 mel_feat_conf: Dict = {'n_fft': 1024, 'num_mels': 80, 'sampling_rate': 22050,
-                                        'hop_size': 256, 'win_size': 1024, 'fmin': 0, 'fmax': 8000}):
+    def __init__(
+        self,
+        input_size: int = 512,
+        output_size: int = 80,
+        spk_embed_dim: int = 192,
+        output_type: str = "mel",
+        vocab_size: int = 4096,
+        input_frame_rate: int = 50,
+        only_mask_loss: bool = True,
+        encoder: torch.nn.Module = None,
+        length_regulator: torch.nn.Module = None,
+        decoder: torch.nn.Module = None,
+        decoder_conf: Dict = {
+            'in_channels': 240,
+            'out_channel': 80,
+            'spk_emb_dim': 80,
+            'n_spks': 1,
+            'cfm_params': CFM_PARAMS,
+            'decoder_params': {
+                'channels': [256, 256],
+                'dropout': 0.0,
+                'attention_head_dim': 64,
+                'n_blocks': 4,
+                'num_mid_blocks': 12,
+                'num_heads': 8,
+                'act_fn': 'gelu',
+            }
+        },
+        mel_feat_conf: Dict = {
+            'n_fft': 1024,
+            'num_mels': 80,
+            'sampling_rate': 22050,
+            'hop_size': 256,
+            'win_size': 1024,
+            'fmin': 0,
+            'fmax': 8000
+        }
+    ):
         super().__init__()
         self.input_size = input_size
         self.output_size = output_size
@@ -48,7 +70,7 @@ class MaskedDiffWithXvec(torch.nn.Module):
         self.vocab_size = vocab_size
         self.output_type = output_type
         self.input_frame_rate = input_frame_rate
-        logging.info(f"input frame rate={self.input_frame_rate}")
+        # logger.info(f"input frame rate={self.input_frame_rate}")
         self.input_embedding = nn.Embedding(vocab_size, input_size)
         self.spk_embed_affine_layer = torch.nn.Linear(spk_embed_dim, output_size)
         self.encoder = encoder
@@ -110,8 +132,13 @@ class MaskedDiffWithXvec(torch.nn.Module):
                   prompt_feat,
                   prompt_feat_len,
                   embedding,
-                  flow_cache):
-        if self.fp16 is True:
+                  flow_cache,
+                  n_timesteps=10,
+                  pbar=None,
+                  temperature=1.0,
+                  flow_cfg_scale=0.7
+                  ):
+        if hasattr(self, 'fp16') and self.fp16 is True:
             prompt_feat = prompt_feat.half()
             embedding = embedding.half()
 
@@ -143,9 +170,12 @@ class MaskedDiffWithXvec(torch.nn.Module):
             mask=mask.unsqueeze(1),
             spks=embedding,
             cond=conds,
-            n_timesteps=10,
+            n_timesteps=n_timesteps,
             prompt_len=mel_len1,
-            flow_cache=flow_cache
+            flow_cache=flow_cache,
+            pbar=pbar,
+            temperature=temperature,
+            flow_cfg_scale=flow_cfg_scale
         )
         feat = feat[:, :, mel_len1:]
         assert feat.shape[2] == mel_len2
@@ -153,25 +183,45 @@ class MaskedDiffWithXvec(torch.nn.Module):
 
 
 class CausalMaskedDiffWithXvec(torch.nn.Module):
-    def __init__(self,
-                 input_size: int = 512,
-                 output_size: int = 80,
-                 spk_embed_dim: int = 192,
-                 output_type: str = "mel",
-                 vocab_size: int = 6561,
-                 input_frame_rate: int = 25,
-                 only_mask_loss: bool = True,
-                 token_mel_ratio: int = 2,
-                 pre_lookahead_len: int = 3,
-                 encoder: torch.nn.Module = None,
-                 decoder: torch.nn.Module = None,
-                 decoder_conf: Dict = {'in_channels': 240, 'out_channel': 80, 'spk_emb_dim': 80, 'n_spks': 1,
-                                       'cfm_params': DictConfig({'sigma_min': 1e-06, 'solver': 'euler', 't_scheduler': 'cosine',
-                                                                 'training_cfg_rate': 0.2, 'inference_cfg_rate': 0.7, 'reg_loss_type': 'l1'}),
-                                       'decoder_params': {'channels': [256, 256], 'dropout': 0.0, 'attention_head_dim': 64,
-                                                          'n_blocks': 4, 'num_mid_blocks': 12, 'num_heads': 8, 'act_fn': 'gelu'}},
-                 mel_feat_conf: Dict = {'n_fft': 1024, 'num_mels': 80, 'sampling_rate': 22050,
-                                        'hop_size': 256, 'win_size': 1024, 'fmin': 0, 'fmax': 8000}):
+    def __init__(
+        self,
+        input_size: int = 512,
+        output_size: int = 80,
+        spk_embed_dim: int = 192,
+        output_type: str = "mel",
+        vocab_size: int = 6561,
+        input_frame_rate: int = 25,
+        only_mask_loss: bool = True,
+        token_mel_ratio: int = 2,
+        pre_lookahead_len: int = 3,
+        encoder: torch.nn.Module = None,
+        decoder: torch.nn.Module = None,
+        decoder_conf: Dict = {
+            'in_channels': 240,
+            'out_channel': 80,
+            'spk_emb_dim': 80,
+            'n_spks': 1,
+            'cfm_params': CFM_PARAMS,
+            'decoder_params': {
+                'channels': [256, 256],
+                'dropout': 0.0,
+                'attention_head_dim': 64,
+                'n_blocks': 4,
+                'num_mid_blocks': 12,
+                'num_heads': 8,
+                'act_fn': 'gelu',
+            }
+        },
+        mel_feat_conf: Dict = {
+            'n_fft': 1024,
+            'num_mels': 80,
+            'sampling_rate': 22050,
+            'hop_size': 256,
+            'win_size': 1024,
+            'fmin': 0,
+            'fmax': 8000
+        }
+    ):
         super().__init__()
         self.input_size = input_size
         self.output_size = output_size
@@ -180,7 +230,7 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
         self.vocab_size = vocab_size
         self.output_type = output_type
         self.input_frame_rate = input_frame_rate
-        logging.info(f"input frame rate={self.input_frame_rate}")
+        # logger.info(f"input frame rate={self.input_frame_rate}")
         self.input_embedding = nn.Embedding(vocab_size, input_size)
         self.spk_embed_affine_layer = torch.nn.Linear(spk_embed_dim, output_size)
         self.encoder = encoder
@@ -202,8 +252,13 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
                   prompt_feat,
                   prompt_feat_len,
                   embedding,
-                  finalize):
-        if self.fp16 is True:
+                  finalize,
+                  n_timesteps=10,
+                  pbar=None,
+                  temperature=1.0,
+                  flow_cfg_scale=0.7
+                  ):
+        if hasattr(self, 'fp16') and self.fp16 is True:
             prompt_feat = prompt_feat.half()
             embedding = embedding.half()
 
@@ -235,7 +290,10 @@ class CausalMaskedDiffWithXvec(torch.nn.Module):
             mask=mask.unsqueeze(1),
             spks=embedding,
             cond=conds,
-            n_timesteps=10
+            n_timesteps=n_timesteps,
+            pbar=pbar,
+            temperature=temperature,
+            flow_cfg_scale=flow_cfg_scale,
         )
         feat = feat[:, :, mel_len1:]
         assert feat.shape[2] == mel_len2
