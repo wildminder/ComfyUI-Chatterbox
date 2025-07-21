@@ -73,6 +73,7 @@ ComfyUI custom nodes for the powerful [Resemble AI Chatterbox](https://github.co
 
 ### Features
 
+*   **Long generation:** No longer limited to 40 seconds.
 *   **Chatterbox TTS Node:** Synthesize speech from text with optional voice cloning from an audio prompt.
 *   **Chatterbox Voice Conversion Node:** Convert the voice in a source audio file to a target voice.
 *   **Automatic Model Downloading:** Models are automatically downloaded from Hugging Face on first use.
