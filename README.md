@@ -103,12 +103,12 @@ ComfyUI custom nodes for the powerful [Resemble AI Chatterbox](https://github.co
         ```
 
 4.  **Model Management:**
-    > [!IMPORTANT]
-    > **For users of previous versions:** This update changes the model directory. You **must manually delete** your old model folder to avoid conflicts:
-    >
-    > **Delete this folder:** `ComfyUI/models/chatterbox_tts/`
-    >
-    > The new version will automatically download models to the correct ComfyUI-standard directory: `ComfyUI/models/tts/chatterbox/`.
+> [!IMPORTANT]  
+> **For users of previous versions:** This update changes the model directory. You **must manually delete** your old model folder to avoid conflicts:
+>
+> **Delete this folder:** `ComfyUI/models/chatterbox_tts/`
+>
+> The new version will automatically download models to the correct ComfyUI-standard directory: `ComfyUI/models/tts/chatterbox/`.
 
 5.  **Restart ComfyUI.**
 
