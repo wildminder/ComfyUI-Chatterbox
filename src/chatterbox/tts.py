@@ -148,7 +148,7 @@ class ChatterboxTTS:
         ckpt_dir = Path(ckpt_dir)
 
         # Always load to CPU first for non-CUDA devices to handle CUDA-saved models
-        if device in ["cpu", "mps"]:
+        if str(device) in ["cpu", "mps"]:
             map_location = torch.device('cpu')
         else:
             map_location = None
