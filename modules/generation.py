@@ -66,6 +66,7 @@ from .device_utils import (
 )
 from .dtype_utils import DTYPE_AUTO, get_dtype_str, resolve_dtype
 from .loader import ChatterboxLoader, ChatterboxModelHandler
+from .vendor_isolation import vendored_chatterbox
 from .model_registry import FAMILY_TTS, evict_if_changed
 from .text_processing import plan_text
 from .patcher import (
@@ -663,6 +664,7 @@ def _generate_one_chunk(
     return result, S3GEN_SAMPLE_RATE
 
 
+@vendored_chatterbox
 def generate_audio(
     model: Any,
     text: str,
@@ -823,6 +825,7 @@ def generate_audio(
     return joined, sample_rate
 
 
+@vendored_chatterbox
 def convert_voice_audio(
     model: Any,
     audio: dict,
@@ -1057,6 +1060,7 @@ def _normalise_waveform(waveform: Any) -> torch.Tensor:
     return result
 
 
+@vendored_chatterbox
 def generate_mtl_audio(
     model: Any,
     text: str,
@@ -1130,6 +1134,7 @@ def generate_mtl_audio(
     return _normalise_waveform(waveform), S3GEN_SAMPLE_RATE
 
 
+@vendored_chatterbox
 def generate_turbo_audio(
     model: Any,
     text: str,
@@ -1191,6 +1196,7 @@ def generate_turbo_audio(
     return _normalise_waveform(waveform), S3GEN_SAMPLE_RATE
 
 
+@vendored_chatterbox
 def generate_flash_audio(
     model: Any,
     text: str,

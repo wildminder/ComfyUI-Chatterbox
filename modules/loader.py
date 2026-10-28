@@ -44,6 +44,7 @@ from .constants import (
     MTL_T3_MODELS,
 )
 from .model_discovery import get_model_pack_path
+from .vendor_isolation import vendored_chatterbox
 from .model_info import (
     AVAILABLE_CHATTERBOX_MODELS,
     CHATTERBOX_WEIGHT_FILES,
@@ -321,6 +322,7 @@ class ChatterboxModelHandler(torch.nn.Module):
 
     # -- loading -------------------------------------------------------
 
+    @vendored_chatterbox
     def load_model(
         self,
         device: torch.device,
@@ -677,6 +679,7 @@ class ChatterboxLoader:
     # -- loading -------------------------------------------------------
 
     @staticmethod
+    @vendored_chatterbox
     def load_model(
         model_name: str,
         device: torch.device,
@@ -987,6 +990,7 @@ class ChatterboxLoader:
                 return name
         return MTL_S3GEN_CHECKPOINTS[0]
 
+    @vendored_chatterbox
     def load_multilingual_model(
         model_name: str,
         t3_model: str,
@@ -1054,6 +1058,7 @@ class ChatterboxLoader:
         )
 
     @staticmethod
+    @vendored_chatterbox
     def load_turbo_model(
         model_name: str,
         device: torch.device,
@@ -1127,6 +1132,7 @@ class ChatterboxLoader:
         return ChatterboxTurboTTS.from_local(pack_dir, str(device), nano=nano)
 
     @staticmethod
+    @vendored_chatterbox
     def load_flash_model(
         model_name: str,
         device: torch.device,
