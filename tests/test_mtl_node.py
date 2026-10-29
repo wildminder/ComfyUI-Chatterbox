@@ -41,7 +41,7 @@ from ComfyUI_Chatterbox.nodes.mtl_node import (
     ChatterboxMTLTTSNode,
 )
 
-from conftest import ROOT_DIR
+from conftest import PKG_ALIAS, ROOT_DIR
 
 SRC_DIR = os.path.join(ROOT_DIR, "src")
 
@@ -190,17 +190,28 @@ class TestLanguageTableMatchesTheVendoredSource:
     def test_the_23_codes_are_the_ones_the_tokenizer_accepts(self) -> None:
         probe = textwrap.dedent(
             """
-            import json, sys
-            sys.path.insert(0, {src_dir!r})
-            from chatterbox.mtl_tts import SUPPORTED_LANGUAGES
-            from chatterbox.mtl_tts import _resolve_multilingual_t3_model
+            import importlib.machinery, json, sys, types
+
+            # The node reaches its vendored tree package-relatively, and the
+            # checkout directory carries a hyphen -- so the child registers the
+            # same alias the harness uses and imports through it.
+            alias = {alias!r}
+            package = types.ModuleType(alias)
+            package.__path__ = [{root!r}]
+            package.__package__ = alias
+            package.__spec__ = importlib.machinery.ModuleSpec(alias, None, is_package=True)
+            package.__spec__.submodule_search_locations = [{root!r}]
+            sys.modules[alias] = package
+
+            from {alias}.src.chatterbox.mtl_tts import SUPPORTED_LANGUAGES
+            from {alias}.src.chatterbox.mtl_tts import _resolve_multilingual_t3_model
             print("__PROBE__" + json.dumps({{
                 "languages": SUPPORTED_LANGUAGES,
                 "default_t3": _resolve_multilingual_t3_model(None),
                 "v3": _resolve_multilingual_t3_model("v3"),
             }}))
             """
-        ).format(src_dir=SRC_DIR)
+        ).format(alias=PKG_ALIAS, root=ROOT_DIR)
         result = subprocess.run(
             [sys.executable, "-c", probe],
             capture_output=True,

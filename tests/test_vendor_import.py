@@ -7,7 +7,13 @@ and takes the whole node registration down with it.
 
 ``conftest.py`` mocks the vendor tree so these tests cannot import it in-process.
 The check therefore runs in a subprocess against the real files, which is also
-the only way to see what a genuine ``import chatterbox`` actually hits.
+the only way to see what a genuine import of the vendored tree actually hits.
+
+That import goes through the node's own package: the vendored tree is private
+to this node, so ``src/`` is not an import root and the top-level
+``chatterbox`` name is not one the shipped code may use. The probe registers
+the package by hand -- the child interpreter has no ComfyUI around it -- and
+imports ``<package>.src.chatterbox``, the way the shipped code reaches it.
 
 The *classifier* those probes feed is the part that has to be right, and an
 environment where the import succeeds is the environment where it is least
@@ -19,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import textwrap
@@ -29,14 +36,31 @@ from conftest import ROOT_DIR
 
 SRC_DIR = os.path.join(ROOT_DIR, "src")
 
+#: The package name ComfyUI derives from the checkout directory. The probe
+#: registers it by hand and sanitises it into a legal module name; the vendored
+#: tree is reached through relative imports, so what the package is called does
+#: not change what the probe finds.
+PACKAGE_NAME = re.sub(r"\W", "_", os.path.basename(ROOT_DIR))
+
 PROBE = textwrap.dedent(
     """
     import importlib
+    import importlib.machinery
     import importlib.metadata as md
-    import json, sys, traceback
+    import json, sys, traceback, types
     from importlib.metadata import PackageNotFoundError
 
-    sys.path.insert(0, {src_dir!r})
+    # The vendored tree is private to this node: it is reached through the
+    # node's own package, and ``src/`` is not an import root. The package is
+    # registered by hand -- the child interpreter has no ComfyUI around it --
+    # so the probe walks the same package-relative path the shipped code uses.
+    alias = {alias!r}
+    package = types.ModuleType(alias)
+    package.__path__ = [{root!r}]
+    package.__package__ = alias
+    package.__spec__ = importlib.machinery.ModuleSpec(alias, None, is_package=True)
+    package.__spec__.submodule_search_locations = [{root!r}]
+    sys.modules[alias] = package
 
     # Make the condition under test reproducible: the package is vendored, so
     # there is no distribution metadata to find. Only *that* lookup is poisoned
@@ -55,7 +79,7 @@ PROBE = textwrap.dedent(
 
     result = {{}}
     try:
-        module = importlib.import_module({module!r})
+        module = importlib.import_module(alias + '.src.' + {module!r})
     except PackageNotFoundError as exc:
         result['kind'] = 'PackageNotFoundError'
         result['detail'] = str(exc)
@@ -107,8 +131,13 @@ def classify_error_kind(probe: dict) -> bool:
 
 
 def run_probe(module: str = "chatterbox") -> dict:
-    """Run the import probe in a clean child interpreter."""
-    script = PROBE.format(src_dir=SRC_DIR, module=module)
+    """Run the import probe in a clean child interpreter.
+
+    ``module`` is a name *under* ``src/``: the probe imports it through the
+    node's own package (``<package>.src.<module>``), never as a top-level
+    name.
+    """
+    script = PROBE.format(alias=PACKAGE_NAME, root=ROOT_DIR, module=module)
     completed = subprocess.run(
         [sys.executable, "-c", script],
         cwd=ROOT_DIR,
@@ -166,7 +195,8 @@ class TestVendorImportWithoutDistMetadata:
                 "covered unconditionally by TestFailureClassifier"
             )
         assert classify_blocker(probe), (
-            f"import chatterbox failed on {probe.get('module')!r}, which is not "
+            f"importing the vendored chatterbox failed on "
+            f"{probe.get('module')!r}, which is not "
             f"a documented blocker (known: {sorted(DOCUMENTED_BLOCKERS)}).\n"
             f"{probe.get('traceback_tail', '')}"
         )
@@ -180,7 +210,8 @@ class TestVendorImportWithoutDistMetadata:
                 "TestFailureClassifier"
             )
         assert classify_error_kind(probe), (
-            f"import chatterbox raised {probe['kind']}: {probe.get('detail')}"
+            f"importing the vendored chatterbox raised {probe['kind']}: "
+            f"{probe.get('detail')}"
         )
 
 
@@ -291,6 +322,7 @@ class TestVersionAttribute:
         running is the module header -- the part that must never raise.
         """
         package = os.path.join(SRC_DIR, "chatterbox")
+        vendored = f"{PACKAGE_NAME}.src.chatterbox"
         script = textwrap.dedent(
             f"""
             import sys, types
@@ -302,25 +334,36 @@ class TestVersionAttribute:
             md.version = _raise
             sys.modules['importlib.metadata'].version = _raise
 
+            # Register the package chain the vendored tree lives in: the node
+            # package, its `src` subpackage, and the vendored package itself.
+            root = types.ModuleType({PACKAGE_NAME!r})
+            root.__path__ = [{ROOT_DIR!r}]
+            root.__package__ = {PACKAGE_NAME!r}
+            sys.modules[{PACKAGE_NAME!r}] = root
+            src_pkg = types.ModuleType({PACKAGE_NAME + '.src'!r})
+            src_pkg.__path__ = [{SRC_DIR!r}]
+            src_pkg.__package__ = {PACKAGE_NAME + '.src'!r}
+            sys.modules[{PACKAGE_NAME + '.src'!r}] = src_pkg
+
             # Register the package and stub its three entry points so only the
             # module header runs. The stubs carry the names __init__ re-exports.
-            pkg = types.ModuleType('chatterbox')
+            pkg = types.ModuleType({vendored!r})
             pkg.__path__ = [{package!r}]
-            pkg.__package__ = 'chatterbox'
-            sys.modules['chatterbox'] = pkg
+            pkg.__package__ = {vendored!r}
+            sys.modules[{vendored!r}] = pkg
             exports = {{
                 'tts': ('ChatterboxTTS',),
                 'vc': ('ChatterboxVC',),
                 'mtl_tts': ('ChatterboxMultilingualTTS', 'SUPPORTED_LANGUAGES'),
             }}
             for name, attrs in exports.items():
-                stub = types.ModuleType('chatterbox.' + name)
+                stub = types.ModuleType({vendored!r} + '.' + name)
                 for attr in attrs:
                     setattr(stub, attr, type(attr, (), {{}}))
-                sys.modules['chatterbox.' + name] = stub
+                sys.modules[{vendored!r} + '.' + name] = stub
 
             source = open({os.path.join(package, '__init__.py')!r}, encoding='utf-8').read()
-            exec(compile(source, 'chatterbox/__init__.py', 'exec'), pkg.__dict__)
+            exec(compile(source, 'src/chatterbox/__init__.py', 'exec'), pkg.__dict__)
             print('__VERSION__' + pkg.__dict__['__version__'])
             """
         )

@@ -188,13 +188,17 @@ for _web_mod in ("server", "aiohttp", "aiohttp.web"):
 # real vendor package drags in librosa/transformers/torch. Every entry is
 # mocked, so the day a vendored file gains a new heavy import, collection
 # still works and the heavy dependency is still absent from sys.modules.
+#
+# The mocks are registered under the node package's alias, not under the
+# top-level ``chatterbox`` name: see :func:`_install_vendor_mocks`.
 
 PKG_ALIAS = "ComfyUI_Chatterbox"
-# `modules/` and `src/` are namespace-style directories with no `__init__.py`,
-# so they need the alias finder to materialise. `nodes/` became a real package
-# in S6.1: it has an `__init__.py` and is resolved by the ordinary path finder
-# through the alias package's `__path__`, so listing it here would only shadow
-# that with a namespace-style stand-in.
+# The alias finder materialises `modules/` and `src/` as namespace-style
+# stand-ins. On disk the two are not alike: `src/` has no `__init__.py` at all,
+# while `modules/` has an empty one and is a real package at runtime (see
+# `tests/test_vendor_loader.py`). `nodes/` became a real package in S6.1: it is
+# resolved by the ordinary path finder through the alias package's `__path__`,
+# so listing it here would only shadow that with a namespace-style stand-in.
 ALIAS_SUBMODULES: tuple[str, ...] = ("modules", "src")
 
 # Entry points upstream v0.1.7 ships. Registered unconditionally, so the mock
@@ -240,10 +244,15 @@ VENDORED_MODULES: tuple[str, ...] = tuple(vendored_module_names())
 
 
 def _install_vendor_mocks(names: Iterable[str]) -> None:
-    """Register a fresh ``MagicMock`` for every name under both prefixes."""
+    """Register a fresh ``MagicMock`` for every name under the aliased prefix.
+
+    Only the aliased form is registered. The top-level ``chatterbox`` name is
+    the one the shipped code must not use, so a harness that fabricates it
+    cannot see a regression back to ``import chatterbox`` -- it would keep
+    passing against a module name the runtime is forbidden to occupy.
+    """
     for name in names:
-        for registered in (name, f"{PKG_ALIAS}.src.{name}"):
-            sys.modules[registered] = MagicMock()
+        sys.modules[f"{PKG_ALIAS}.src.{name}"] = MagicMock()
 
 
 _install_vendor_mocks(VENDORED_MODULES)
@@ -404,10 +413,10 @@ def ensure_alias_submodules() -> dict[str, ModuleType]:
 # conftest import, but a failure degrades to a bare namespace package instead of
 # killing collection -- later batches still need the submodules.
 #
-# ``sys.path`` is snapshotted and restored around the exec: today's
-# ``__init__.py`` does ``sys.path.insert(0, src_dir)`` and injects a ``perth``
-# stub as global side effects. The harness must not inherit them -- Phase 2
-# removes both, and a test asserting they are gone has to start from a clean
+# ``sys.path`` is snapshotted and restored around the exec: the entry point
+# does not write to ``sys.path`` any more (the vendored tree is reached
+# package-relatively), but the harness must not inherit a path entry from any
+# import -- a test asserting the mutation is gone has to start from a clean
 # slate (S2.4). Entries added later by pytest are unaffected: only the delta is
 # removed.
 _repo_init = os.path.join(ROOT_DIR, "__init__.py")

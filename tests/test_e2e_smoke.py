@@ -110,7 +110,7 @@ def model(model_dir: str, reference_wav: str):
     from .conftest_helpers import load_real_vendor  # noqa: PLC0415 -- opt-in only
 
     load_real_vendor()
-    from chatterbox.tts import ChatterboxTTS  # noqa: PLC0415
+    from ComfyUI_Chatterbox.src.chatterbox.tts import ChatterboxTTS  # noqa: PLC0415
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     if device == "cpu":
@@ -239,7 +239,7 @@ class TestVoiceConversion:
         from .conftest_helpers import load_real_vendor  # noqa: PLC0415
 
         load_real_vendor()
-        from chatterbox.vc import ChatterboxVC  # noqa: PLC0415
+        from ComfyUI_Chatterbox.src.chatterbox.vc import ChatterboxVC  # noqa: PLC0415
 
         if not torch.cuda.is_available():
             pytest.skip("no CUDA device")

@@ -238,7 +238,12 @@ class TestPackageAlias:
         )
 
     def test_repo_init_does_not_leak_sys_path_entries(self):
-        """``__init__.py`` inserts ``src/`` into sys.path; conftest undoes it.
+        """``__init__.py`` no longer touches sys.path; conftest keeps it clean.
+
+        The vendored tree is reached through the node package, so the entry
+        point has no reason to write to ``sys.path``. The harness still
+        snapshots and restores it around the alias registration, so a path
+        entry added by any import cannot leak into the suite.
 
         Phase 2 (S2.4) asserts the mutation is gone from the source. That
         assertion is only meaningful if the harness starts from a clean slate.
@@ -323,13 +328,16 @@ class TestVendorMocking:
             "chatterbox.tts_turbo",
             "chatterbox.models",
         ):
-            assert isinstance(sys.modules[name], MagicMock), name
+            assert isinstance(sys.modules[f"{cf.PKG_ALIAS}.src.{name}"], MagicMock), name
 
     def test_every_vendored_leaf_is_mocked(self):
         """One dotted name per real file under src/chatterbox/."""
         for name in cf.VENDORED_MODULES:
-            assert isinstance(sys.modules[name], MagicMock), name
             assert isinstance(sys.modules[f"{cf.PKG_ALIAS}.src.{name}"], MagicMock), name
+            assert name not in sys.modules, (
+                f"{name} is registered under its bare top-level name; the "
+                "harness must not fabricate the name the shipped code may not use"
+            )
 
     def test_vendored_module_list_matches_the_tree(self):
         """The mocked list is derived from the tree, not hand-maintained."""
@@ -349,11 +357,15 @@ class TestVendorMocking:
         """The shape the plan cares about: importing the entry point is cheap."""
 
         class _Helper:
-            from chatterbox.tts import ChatterboxTTS
-            from chatterbox.vc import ChatterboxVC
+            from ComfyUI_Chatterbox.src.chatterbox.tts import ChatterboxTTS
+            from ComfyUI_Chatterbox.src.chatterbox.vc import ChatterboxVC
 
-        assert isinstance(sys.modules["chatterbox.tts"].ChatterboxTTS, MagicMock)
-        assert isinstance(sys.modules["chatterbox.vc"].ChatterboxVC, MagicMock)
+        assert isinstance(
+            sys.modules[f"{cf.PKG_ALIAS}.src.chatterbox.tts"].ChatterboxTTS, MagicMock
+        )
+        assert isinstance(
+            sys.modules[f"{cf.PKG_ALIAS}.src.chatterbox.vc"].ChatterboxVC, MagicMock
+        )
 
     def test_diffusers_never_loaded(self):
         """diffusers is installed but broken in this environment."""
@@ -374,7 +386,6 @@ class TestVendorMocking:
 
     def test_heaviest_optional_deps_not_loaded_by_vendor_aliases(self):
         """s3tokenizer/conformer are mocked away under the vendored tree."""
-        assert "chatterbox.models.s3tokenizer.s3tokenizer" in cf.VENDORED_MODULES
-        assert isinstance(
-            sys.modules["chatterbox.models.s3tokenizer.s3tokenizer"], MagicMock
-        )
+        name = "chatterbox.models.s3tokenizer.s3tokenizer"
+        assert name in cf.VENDORED_MODULES
+        assert isinstance(sys.modules[f"{cf.PKG_ALIAS}.src.{name}"], MagicMock)
