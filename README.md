@@ -88,6 +88,9 @@ from upstream's own packs, fetched on first run:
 Turbo and Nano are one family with two `t3` checkpoints: the folder is shared,
 the dropdown entry -- not the folder -- picks the weights.
 
+The vendored code is private to this node: it is imported under this node's
+own package name, so it never collides with another plugin's `chatterbox`.
+
 <details>
 <summary><b>Paralinguistic tags -- the 19 exact spellings</b></summary>
 
