@@ -759,8 +759,8 @@ class ChatterboxLoader:
         # Imported here, never at module scope: the vendored package drags in
         # librosa, transformers and the whole model stack, and collection must
         # never pay for that.
-        from chatterbox.tts import ChatterboxTTS
-        from chatterbox.vc import ChatterboxVC
+        from ..src.chatterbox.tts import ChatterboxTTS
+        from ..src.chatterbox.vc import ChatterboxVC
 
         device_arg = str(device)
         logging.info(
@@ -1040,7 +1040,7 @@ class ChatterboxLoader:
             )
 
         # Imported here, never at module scope -- see the note in load_model.
-        from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+        from ..src.chatterbox.mtl_tts import ChatterboxMultilingualTTS
 
         logging.info(
             "[Chatterbox TTS] Building multilingual '%s' (%s) from '%s' on %s...",
@@ -1115,7 +1115,7 @@ class ChatterboxLoader:
             )
 
         # Imported here, never at module scope -- see the note in load_model.
-        from chatterbox.tts_turbo import ChatterboxTurboTTS
+        from ..src.chatterbox.tts_turbo import ChatterboxTurboTTS
 
         logging.info(
             "[Chatterbox TTS] Building %s '%s' from '%s' on %s...",
@@ -1184,7 +1184,7 @@ class ChatterboxLoader:
             )
 
         try:
-            from chatterbox_flash import ChatterboxFlashTTS
+            from ..src.chatterbox_flash import ChatterboxFlashTTS
         except ImportError as exc:
             raise FileNotFoundError(
                 f"The Flash pack '{model_name}' needs this node's vendored "

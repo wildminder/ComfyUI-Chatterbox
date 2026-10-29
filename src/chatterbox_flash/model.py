@@ -52,9 +52,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from chatterbox.models.t3.t3 import T3 as _ChatterboxT3
-from chatterbox.models.t3.modules.cond_enc import T3Cond
-from chatterbox.models.t3.modules.t3_config import T3Config
+from ..chatterbox.models.t3.t3 import T3 as _ChatterboxT3
+from ..chatterbox.models.t3.modules.cond_enc import T3Cond
+from ..chatterbox.models.t3.modules.t3_config import T3Config
 
 from .cfg_guidance import apply_zero_text_cfg_from_logits, pmi_cfg_combine
 from .engines import FLASHINFER_AVAILABLE, InferenceEngine, build_engine

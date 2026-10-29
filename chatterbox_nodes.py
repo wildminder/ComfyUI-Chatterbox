@@ -21,7 +21,6 @@ import logging
 
 from comfy_api.latest import ComfyExtension, io
 
-from .modules.vendor_loader import ensure_vendor_on_path
 from .nodes import (
     ChatterboxDialogNode,
     ChatterboxMTLTTSNode,
@@ -39,13 +38,14 @@ class ChatterboxExtension(ComfyExtension):
     async def on_load(self) -> None:
         """Prepare the process for the first node execution.
 
-        Idempotent, and deliberately minimal: the only thing that must happen
-        before a node runs is the vendored package being importable, and
-        ``ensure_vendor_on_path`` appends the repository's ``src/`` at most once.
-        ComfyUI may call this more than once (a reload, a second server), so it
-        must stay free of side effects that only make sense once.
+        Idempotent, and deliberately minimal: the vendored package is imported
+        package-relatively (``.src.chatterbox…`` from the package root,
+        ``..src.chatterbox…`` from a module inside it), so it is importable as
+        soon as this package is loaded and nothing has to be put on
+        ``sys.path``. ComfyUI may call this more than once (a reload, a second
+        server), so it must stay free of side effects that only make sense
+        once.
         """
-        ensure_vendor_on_path()
         logging.debug("[Chatterbox TTS] Extension loaded.")
 
     async def get_node_list(self) -> list[type[io.ComfyNode]]:

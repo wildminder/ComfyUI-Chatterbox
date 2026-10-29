@@ -1,13 +1,17 @@
 """Backwards-compatibility shim — :class:`FlashInferEngine` now lives in
-:mod:`chatterbox_flash.engines.flashinfer`.
+:mod:`.engines.flashinfer`.
 
-The original module path is preserved so existing scripts that did
+The vendored tree is private to this ComfyUI node, so ``chatterbox_flash``
+is no longer a top-level package: this module is reachable only through the
+node's own package. How many leading dots that takes depends on where the
+importer sits -- one from the package root (``chatterbox_nodes.py``), two from a
+module inside the package (``modules/loader.py``):
 
-    from chatterbox_flash.attention_flashinfer import FlashInferEngine
+    from .src.chatterbox_flash.attention_flashinfer import FlashInferEngine
+    from ..src.chatterbox_flash.attention_flashinfer import FlashInferEngine
 
-continue to work.  New code should import from
-``chatterbox_flash.engines`` (or call :func:`chatterbox_flash.engines.build_engine`)
-instead.
+New code should import from the ``engines`` subpackage (or call
+:func:`.engines.build_engine`) instead.
 """
 
 from __future__ import annotations
