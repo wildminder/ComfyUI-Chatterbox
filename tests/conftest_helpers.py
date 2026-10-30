@@ -14,6 +14,7 @@ Two things live here:
 from __future__ import annotations
 
 import contextlib
+import importlib
 import json
 import os
 import sys
@@ -43,16 +44,19 @@ FROZEN_SNAPSHOT_PATH = os.path.join(TESTS_DIR, "frozen_widget_snapshot.json")
 def unload_vendor_mocks() -> int:
     """Drop every ``MagicMock`` the harness registered for the vendored tree.
 
-    Returns the number of entries removed. Only the two prefixes the harness
-    registers are touched -- ``chatterbox.*`` and the aliased
-    ``ComfyUI_Chatterbox.src.chatterbox.*`` -- so nothing else in the process is
-    disturbed.
+    Returns the number of entries removed. The harness registers the tree
+    under the aliased prefix ``ComfyUI_Chatterbox.src.chatterbox`` -- the
+    package itself and everything below it -- only; the bare ``chatterbox``
+    name is swept as well, so a leftover from an older harness cannot
+    masquerade as the real package while the real one is being imported.
+    Nothing else in the process is disturbed.
     """
-    prefixes = ("chatterbox.", "ComfyUI_Chatterbox.src.chatterbox.")
+    prefixes = ("chatterbox.", f"{PKG_ALIAS}.src.chatterbox.")
     doomed = [
         name
         for name in sys.modules
-        if name == "chatterbox" or name.startswith(prefixes)
+        if name in ("chatterbox", f"{PKG_ALIAS}.src.chatterbox")
+        or name.startswith(prefixes)
     ]
     for name in doomed:
         sys.modules.pop(name, None)
@@ -67,18 +71,18 @@ def load_real_vendor() -> None:
     the one place that must be undone, which is why it is an explicit call and
     not a fixture the whole suite inherits.
 
-    The package is appended to ``sys.path``, never prepended, so a
-    pip-installed ``chatterbox`` still takes precedence -- the same rule the
-    vendor loader in the node follows.
+    The real tree is reached through the node package -- the same
+    package-relative path the shipped code uses -- so the vendored sources are
+    what loads, and not a pip-installed ``chatterbox`` that happens to sit on
+    ``sys.path``.
     """
     unload_vendor_mocks()
-    if SRC_DIR not in sys.path:
-        sys.path.append(SRC_DIR)
 
-    import chatterbox  # noqa: PLC0415 -- deliberate late import
-
-    assert hasattr(chatterbox, "__file__"), (
-        "the vendored chatterbox resolved to a stub, not the real package"
+    chatterbox = importlib.import_module(f"{PKG_ALIAS}.src.chatterbox")
+    origin = getattr(chatterbox, "__file__", None)
+    assert origin and os.path.realpath(origin).startswith(os.path.realpath(SRC_DIR)), (
+        f"the vendored chatterbox resolved to {origin!r}, not the real package "
+        f"under {SRC_DIR!r}"
     )
 
 
@@ -91,11 +95,16 @@ def real_vendor_modules(names: Iterable[str]):
     harness mocks the whole tree so collection never loads the model stack, so
     those tests lift the mocks for their duration.
 
-    The restore is the part that matters. ``unload_vendor_mocks`` removes **both**
-    prefixes the harness registers (``chatterbox.*`` and
-    ``ComfyUI_Chatterbox.src.chatterbox.*``); a restore that only puts the first
-    back leaves the suite quietly un-mocked for every test that runs afterwards,
-    and ``tests/test_conftest.py`` finds it. So both are snapshotted here.
+    The restore is the part that matters. ``unload_vendor_mocks`` removes the
+    aliased prefix the harness registers
+    (``ComfyUI_Chatterbox.src.chatterbox.*``); a restore that puts nothing
+    back leaves the suite quietly un-mocked for every test that runs
+    afterwards, and ``tests/test_conftest.py`` finds it. So that prefix is
+    snapshotted here.
+
+    The real modules are imported through the node package -- the same path
+    the shipped code uses -- so a pip-installed ``chatterbox`` on ``sys.path``
+    cannot answer for ours.
 
     Args:
         names: Dotted names relative to ``chatterbox``, e.g.
@@ -104,29 +113,30 @@ def real_vendor_modules(names: Iterable[str]):
     Yields:
         The imported modules, keyed by the dotted name that was asked for.
     """
-    import importlib
-
-    prefixes = ("chatterbox", f"{PKG_ALIAS}.src.chatterbox")
+    prefix = f"{PKG_ALIAS}.src.chatterbox"
     saved = {
         name: module
         for name, module in sys.modules.items()
-        if any(name == prefix or name.startswith(prefix + ".") for prefix in prefixes)
+        if name == prefix or name.startswith(prefix + ".")
     }
     # ``sys.path`` is restored too: ``tests/test_conftest.py`` asserts that
-    # importing the node package leaves it untouched, and leaving this
-    # repository's own ``src/`` behind would be a leak of exactly the kind that
-    # test exists to catch.
+    # importing the node package leaves it untouched, and a path entry left
+    # behind by the import would be a leak of exactly the kind that test
+    # exists to catch.
     saved_path = list(sys.path)
     try:
         unload_vendor_mocks()
-        src_dir = SRC_DIR
-        if src_dir not in sys.path:
-            sys.path.append(src_dir)
-        for name in [n for n in sys.modules if n.startswith(prefixes)]:
+        for name in [
+            n for n in sys.modules if n == prefix or n.startswith(prefix + ".")
+        ]:
             sys.modules.pop(name, None)
-        yield {name: importlib.import_module(f"chatterbox.{name}") for name in names}
+        yield {
+            name: importlib.import_module(f"{prefix}.{name}") for name in names
+        }
     finally:
-        for name in [n for n in sys.modules if n.startswith(prefixes)]:
+        for name in [
+            n for n in sys.modules if n == prefix or n.startswith(prefix + ".")
+        ]:
             sys.modules.pop(name, None)
         sys.modules.update(saved)
         sys.path[:] = saved_path

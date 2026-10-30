@@ -49,11 +49,12 @@ from conftest import ROOT_DIR
 def attention_qkv():
     """The real vendored ``AttentionQKV``, with the harness mocks restored after.
 
-    ``conftest.py`` mocks every ``chatterbox.*`` name so collection never loads
-    the model stack. This one class is cheap -- it imports torch and einops only
-    -- and it is the module whose behaviour the attention tests are about, so the
-    mocks are lifted for this fixture and put back on teardown by
-    :func:`conftest_helpers.real_vendor_modules`, which restores *both* prefixes
+    ``conftest.py`` mocks every name under the vendored tree -- under the node
+    package's alias, never under the top-level ``chatterbox`` -- so collection
+    never loads the model stack. This one class is cheap -- it imports torch and
+    einops only -- and it is the module whose behaviour the attention tests are
+    about, so the mocks are lifted for this fixture and put back on teardown by
+    :func:`conftest_helpers.real_vendor_modules`, which restores the one prefix
     the harness registers.
     """
     from .conftest_helpers import real_vendor_modules

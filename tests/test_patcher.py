@@ -757,6 +757,13 @@ class TestLoaderSurface:
             "load_model must attempt a download before giving up; the failure "
             "message is only truthful if it did"
         )
+        # The combo value is a legacy spelling, but the download step reads the
+        # registry by the *canonical* name: an alias must still find the
+        # repository the classic pack comes from, or a saved workflow would be
+        # handed an empty repo and then told the pack was missing.
+        assert attempts[0][1] == "ResembleAI/chatterbox", (
+            f"the fetch targeted {attempts[0][1]!r}, not the classic repository"
+        )
         # The classic fetch is filtered: shared weights come from the store.
         assert patterns_seen == [
             ["t3_cfg.safetensors", "tokenizer.json", "conds.pt"]

@@ -8,7 +8,8 @@ Before this change, importing the ComfyUI node package:
   installation of the watermarking library was invisible to the rest of the
   process.
 
-Both are gone. ``sys.path`` gains at most one entry and only at the tail;
+Both are gone. ``sys.path`` is left exactly as it was found: the vendored tree
+is reached through the node's own package, so nothing is added to it.
 ``perth`` is never fabricated; ``diffusers`` -- installed but unimportable in
 this environment -- is never pulled in.
 
@@ -152,25 +153,25 @@ def probe() -> dict:
 
 
 class TestCleanInterpreterImport:
-    def test_sys_path_gains_at_most_one_entry(self, probe: dict) -> None:
-        assert len(probe["added"]) <= 1, (
+    def test_sys_path_is_untouched(self, probe: dict) -> None:
+        """Importing the node package adds nothing to ``sys.path``."""
+        assert probe["added"] == [], (
             f"importing the node package added {probe['added']!r} to sys.path"
         )
-
-    def test_the_entry_is_the_tail(self, probe: dict) -> None:
-        if SRC_DIR not in probe["added"]:
-            pytest.skip(
-                f"src/ was already on sys.path in the probe interpreter "
-                f"(count={probe['src_count']}); the append was a no-op"
-            )
         assert probe["prefix_changed"] is False, (
             "an existing sys.path entry was reordered by the node package"
         )
-        assert probe["src_index"] == probe["sys_path_len"] - 1, (
-            f"src/ was added at index {probe['src_index']} of "
-            f"{probe['sys_path_len']}; it must be the tail"
+
+    def test_src_is_not_an_import_root(self, probe: dict) -> None:
+        """``src/`` is reached through the node package, not through sys.path."""
+        assert probe["src_count"] == 0, (
+            f"importing the node package put src/ on sys.path "
+            f"{probe['src_count']} time(s)"
         )
-        assert probe["src_count"] == 1
+        assert probe["src_index"] is None, (
+            f"src/ sits at index {probe['src_index']} of sys.path; the vendored "
+            "tree must not be an import root"
+        )
 
     def test_perth_is_not_injected(self, probe: dict) -> None:
         assert probe["perth_in_modules"] is False, (

@@ -33,7 +33,7 @@ from typing import Any
 
 import pytest
 
-from conftest import ROOT_DIR
+from conftest import PKG_ALIAS, ROOT_DIR
 
 SRC_DIR = os.path.join(ROOT_DIR, "src")
 VENDOR_DIR = os.path.join(SRC_DIR, "chatterbox")
@@ -586,8 +586,10 @@ class TestVendorIsNeverImportedForReal:
             "chatterbox.vc",
             "chatterbox.models.t3.t3",
         ):
-            assert isinstance(sys.modules.get(name), MagicMock), (
-                f"{name} was imported for real; the harness must keep the vendor mocked"
+            aliased = f"{PKG_ALIAS}.src.{name}"
+            assert isinstance(sys.modules.get(aliased), MagicMock), (
+                f"{aliased} was imported for real; the harness must keep the "
+                "vendor mocked"
             )
 
     def test_sig_probe_leaves_no_trace(self) -> None:

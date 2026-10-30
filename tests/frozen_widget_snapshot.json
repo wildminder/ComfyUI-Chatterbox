@@ -38,7 +38,7 @@
           "index": 0,
           "name": "model_pack_name",
           "type": "COMBO",
-          "default": "resembleai_default_voice",
+          "default": "chatterbox",
           "options": null,
           "options_source": "get_chatterbox_model_pack_names()",
           "min": null,
@@ -233,7 +233,7 @@
           "index": 0,
           "name": "model_pack_name",
           "type": "COMBO",
-          "default": "resembleai_default_voice",
+          "default": "chatterbox",
           "options": null,
           "options_source": "get_chatterbox_model_pack_names()",
           "min": null,
@@ -365,8 +365,8 @@
       ]
     },
     "DEFAULT_MODEL_PACK_NAME": {
-      "value": "resembleai_default_voice",
-      "parts": ["resembleai_default_voice"]
+      "value": "chatterbox",
+      "parts": ["chatterbox"]
     }
   }
 }

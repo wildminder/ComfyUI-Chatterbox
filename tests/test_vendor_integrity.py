@@ -20,7 +20,7 @@ import re
 
 import pytest
 
-from conftest import ROOT_DIR
+from conftest import PKG_ALIAS, ROOT_DIR
 
 VENDOR_DIR = os.path.join(ROOT_DIR, "src", "chatterbox")
 
@@ -221,11 +221,18 @@ class TestVendorTreeIsInertDuringCollection:
         import sys
         from unittest.mock import MagicMock
 
-        module = sys.modules.get("chatterbox")
+        # The harness registers the tree under this node's package alias; the
+        # top-level ``chatterbox`` name belongs to whoever else ships it, so
+        # the harness must not fabricate it either.
+        module = sys.modules.get(f"{PKG_ALIAS}.src.chatterbox")
         assert module is not None, "the harness should have registered a stand-in"
         assert isinstance(module, MagicMock), (
             "the real vendor package was imported; collection must never load "
             "perth, diffusers or the model stack"
+        )
+        assert "chatterbox" not in sys.modules, (
+            "a top-level chatterbox is registered; the vendored tree must be "
+            "reached through this node's package, never as a global name"
         )
 
 

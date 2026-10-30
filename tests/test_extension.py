@@ -136,16 +136,17 @@ class TestOnLoad:
     def test_on_load_is_idempotent(self, extension) -> None:
         """ComfyUI may call it more than once; a later call must be a no-op.
 
-        The first call is expected to do the one-time work (appending the
-        vendored ``src/`` to ``sys.path``). What must not happen is the second
-        call repeating it, so the snapshot is taken *after* the first.
+        ``on_load`` has no one-time work left to do: the vendored tree is
+        imported package-relatively, so nothing is put on ``sys.path``. What
+        must not happen is a call growing the global import state, so the
+        snapshot is taken *after* the first.
         """
         run(extension.on_load())
         before = list(sys.path)
         run(extension.on_load())
         run(extension.on_load())
         assert sys.path == before, (
-            "on_load grew sys.path on a repeat call; the vendor loader is "
+            "on_load grew sys.path on a repeat call; the extension is "
             "supposed to be idempotent"
         )
 

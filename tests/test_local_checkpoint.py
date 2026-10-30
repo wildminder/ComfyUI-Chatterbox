@@ -42,7 +42,11 @@ from ComfyUI_Chatterbox.modules.model_info import (
     scan_chatterbox_models,
 )
 
-from conftest import ROOT_DIR
+from conftest import PKG_ALIAS, ROOT_DIR
+
+#: The vendored Flash package is reached package-relatively, under the alias
+#: this checkout is registered under -- not under the top-level name.
+FLASH_PACKAGE = f"{PKG_ALIAS}.src.chatterbox_flash"
 
 
 # ---------------------------------------------------------------------------
@@ -54,8 +58,8 @@ _MAP_LOCATION_PROBE = textwrap.dedent(
     import tempfile
     from pathlib import Path
 
-    from chatterbox.mtl_tts import ChatterboxMultilingualTTS
-    from chatterbox.vc import ChatterboxVC
+    from ComfyUI_Chatterbox.src.chatterbox.mtl_tts import ChatterboxMultilingualTTS
+    from ComfyUI_Chatterbox.src.chatterbox.vc import ChatterboxVC
 
     def _pack(*names):
         directory = Path(tempfile.mkdtemp())
@@ -121,9 +125,9 @@ def real_vendor():
     """The real vendored entry points, with the harness mocks put back afterwards.
 
     These tests are about the ``from_local`` guards, which exist only in the real
-    files. :func:`conftest_helpers.real_vendor_modules` restores **both** prefixes
-    the harness registers on teardown, so every later test in the suite still
-    finds a mocked tree.
+    files. :func:`conftest_helpers.real_vendor_modules` restores the aliased
+    prefix the harness registers on teardown, so every later test in the suite
+    still finds a mocked tree.
     """
     from .conftest_helpers import real_vendor_modules
 
@@ -560,9 +564,9 @@ class TestIncompleteDirectoryIsRefused:
             ChatterboxLoader, "download_pack",
             staticmethod(lambda *a, **k: None),
         )
-        stub = _types.ModuleType("chatterbox_flash")
+        stub = _types.ModuleType(FLASH_PACKAGE)
         stub.ChatterboxFlashTTS = FakeFlashTTS
-        monkeypatch.setitem(_sys.modules, "chatterbox_flash", stub)
+        monkeypatch.setitem(_sys.modules, FLASH_PACKAGE, stub)
 
         ChatterboxLoader.load_flash_model(
             "chatterbox-flash", torch.device("cpu"), model_path=str(pack)
@@ -588,8 +592,8 @@ class TestIncompleteDirectoryIsRefused:
             (pack / name).write_bytes(b"\x00" * 4)
         import sys as _sys
 
-        saved = _sys.modules.pop("chatterbox_flash", None)
-        _sys.modules["chatterbox_flash"] = None  # import raises ImportError
+        saved = _sys.modules.pop(FLASH_PACKAGE, None)
+        _sys.modules[FLASH_PACKAGE] = None  # import raises ImportError
         try:
             with pytest.raises(FileNotFoundError) as caught:
                 ChatterboxLoader.load_flash_model(
@@ -597,9 +601,9 @@ class TestIncompleteDirectoryIsRefused:
                 )
         finally:
             if saved is not None:
-                _sys.modules["chatterbox_flash"] = saved
+                _sys.modules[FLASH_PACKAGE] = saved
             else:
-                del _sys.modules["chatterbox_flash"]
+                del _sys.modules[FLASH_PACKAGE]
         message = str(caught.value)
         assert "src/chatterbox_flash" in message
         assert "pip-install" in message and "no-deps" not in message

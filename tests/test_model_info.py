@@ -38,7 +38,7 @@ from ComfyUI_Chatterbox.modules.model_info import (
 )
 
 REQUIRED_OFFICIAL_MODELS = (
-    "resembleai_default_voice",
+    "chatterbox",
     "T3_v1",
     "T3_v2",
     "T3_v3",
@@ -80,10 +80,10 @@ class TestOfficialRegistry:
         assert config["size_gb"] > 0
 
     def test_the_default_pack_uses_the_frozen_repo(self) -> None:
-        assert MODEL_CONFIGS["resembleai_default_voice"]["repo_id"] == CHATTERBOX_REPO_ID
+        assert MODEL_CONFIGS["chatterbox"]["repo_id"] == CHATTERBOX_REPO_ID
 
     def test_the_default_pack_downloads_the_frozen_file_list(self) -> None:
-        assert MODEL_CONFIGS["resembleai_default_voice"]["files"] == CHATTERBOX_FILES_TO_DOWNLOAD
+        assert MODEL_CONFIGS["chatterbox"]["files"] == CHATTERBOX_FILES_TO_DOWNLOAD
 
     def test_turbo_and_nano_come_from_their_own_repositories(self) -> None:
         assert MODEL_CONFIGS["chatterbox-turbo"]["repo_id"] == "ResembleAI/chatterbox-turbo"
@@ -535,8 +535,14 @@ class TestPackNameAliases:
     spelling has to keep resolving -- but it is never offered in the
     dropdown, and one table is the only place that knows about it."""
 
-    def test_the_alias_points_at_the_nano_pack(self) -> None:
-        assert set(model_info.PACK_ALIASES.values()) == {"chatterbox-nano"}
+    def test_the_aliases_point_at_the_packs_they_replaced(self) -> None:
+        """Two renames, two aliases: the Turbo-family member upstream
+        renamed, and the classic pack this repository stopped calling by an
+        internal id when the dropdown learned the upstream name."""
+        assert set(model_info.PACK_ALIASES.values()) == {
+            "chatterbox-nano",
+            "chatterbox",
+        }
 
     def test_every_alias_points_at_a_real_pack(self) -> None:
         for alias, canonical in model_info.PACK_ALIASES.items():

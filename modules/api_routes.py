@@ -68,6 +68,7 @@ from .model_info import (
     canonical_pack_name,
     describe_model_dir,
     is_chatterbox_model_dir,
+    pack_spellings,
     scan_chatterbox_models,
 )
 
@@ -240,16 +241,24 @@ def _is_official_pack_present(
     renamed pack asks about the very directory the current name asks about --
     and a config that names no folder of its own inherits the canonical
     entry's.
+
+    Every spelling of that folder is probed, not just the current one: an
+    install that predates a rename still has its weights in a folder named
+    after the old id, and reporting that pack as "not downloaded" would offer
+    the user a download they have already paid for. The canonical spelling is
+    tried first, so a machine holding both folders reports the current name's.
     """
     canonical = canonical_pack_name(model_name)
     folder = str(config.get("folder") or "")
     if not folder:
         official = MODEL_CONFIGS.get(canonical, {})
         folder = str(official.get("folder") or canonical)
+    folders = sorted(pack_spellings(folder), key=lambda name: name != folder)
     for root in _tts_roots(folder_paths_module):
-        model_dir = os.path.join(root, CHATTERBOX_SUBDIR_NAME, folder)
-        if _pack_files_present(model_dir, config.get("files")):
-            return True
+        for candidate in folders:
+            model_dir = os.path.join(root, CHATTERBOX_SUBDIR_NAME, candidate)
+            if _pack_files_present(model_dir, config.get("files")):
+                return True
     return False
 
 

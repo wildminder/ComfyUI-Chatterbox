@@ -38,7 +38,7 @@ import torch.multiprocessing as mp
 import torchaudio as ta
 from tqdm import tqdm
 
-from chatterbox.models.s3gen import S3GEN_SR
+from ...chatterbox.models.s3gen import S3GEN_SR
 
 from ..tts import ChatterboxFlashTTS
 

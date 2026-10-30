@@ -113,15 +113,43 @@ to a hand-written `scaled_dot_product_attention` reference.
 These are this repository's own files, not vendored ones, so they carry no patch
 id above; recorded here because they are the other half of the same change.
 
-- `modules/vendor_loader.py` (new) — `ensure_vendor_on_path()`, one idempotent
-  `sys.path.append` of this repository's `src/`. `append`, never
-  `insert(0, ...)`, so a pip-installed `chatterbox` keeps winning.
+- `modules/vendor_loader.py` (removed) — the `sys.path.append` of this
+  repository's `src/` is gone. The vendored tree is imported
+  package-relatively (`from ..src.chatterbox…`), so it no longer occupies the
+  top-level `chatterbox` name: a pip-installed or foreign `chatterbox` can
+  neither shadow it nor be shadowed by it.
 - `modules/__init__.py` (new, empty) — makes `modules` a real package so the
   loader can be imported without re-exports.
-- `__init__.py` — dropped `sys.path.insert(0, src_dir)` (now
-  `ensure_vendor_on_path()`) and dropped the `sys.modules['perth'] = perth_mock`
+- `__init__.py` — dropped the `sys.path` manipulation that published `src/` as
+  a top-level import root, and dropped the `sys.modules['perth'] = perth_mock`
   stub injection, which the optional-`perth` patches P-023…P-026 make
   unnecessary. Importing the node package no longer mutates global import state.
 - `modules/chatterbox_handler.py` — `chatterbox.tts` / `chatterbox.vc` are
   imported inside `load_chatterbox_models` instead of at module scope, so ComfyUI's
   node load no longer pulls librosa, transformers and the model stack in.
+- `chatterbox_nodes.py` — dropped the `ensure_vendor_on_path()` call from the
+  extension's `on_load`: the vendored tree is reached package-relatively and
+  needs no import-path preparation, so the node's extension entry point no
+  longer mutates global import state either.
+
+## Vendored `chatterbox_flash` changes
+
+`src/chatterbox_flash/` is a second vendored tree, and its local edits are
+recorded in `src/chatterbox_flash/VENDORED.md` rather than in the table above:
+every row of that table must name a file under `chatterbox/`, and this
+manifest's coverage walk only looks at `src/chatterbox/`, so a
+`chatterbox_flash/` row would be invisible to the very tests that check the
+manifest. The entry below is the same change, on this side of the record.
+Paths are relative to `src/`, as in the table above.
+
+- `chatterbox_flash/tts.py`, `chatterbox_flash/model.py`,
+  `chatterbox_flash/eval/generate.py`, `chatterbox_flash/eval/wer_seedtts.py`
+  — the eleven absolute `from chatterbox.models…` imports the flash tree
+  shipped with are now package-relative: `..chatterbox.models…` from the two
+  files at the package root, `...chatterbox.models…` from the two under
+  `eval/`. The flash tree is not a top-level `chatterbox_flash` package any
+  more — it is private to this node and is reached under this node's own
+  package name — so an absolute import could only ever reach whatever
+  `chatterbox` happened to be installed, which is exactly what the tree
+  exists to prevent. The rewrite changes which tree the imports reach and
+  nothing else: the same names, from the same modules, in the same order.

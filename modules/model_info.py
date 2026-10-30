@@ -47,6 +47,7 @@ __all__ = [
     "official_pack_names",
     "PACK_ALIASES",
     "canonical_pack_name",
+    "pack_spellings",
     "NANO_ENTRY_SUFFIX",
     "is_chatterbox_model_dir",
     "scan_chatterbox_models",
@@ -89,8 +90,10 @@ SHARED_ASSET_FILES = frozenset(
 
 MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
     # The pack a saved workflow names by default. Monolingual English, voice
-    # cloning, the source of every other official pack.
-    "resembleai_default_voice": {
+    # cloning, the source of every other official pack. Named after the
+    # upstream repository it comes from -- it used to be keyed by this
+    # repository's own internal id, and the old spelling is an alias below.
+    "chatterbox": {
         "repo_id": CHATTERBOX_REPO_ID,
         "architecture": "chatterbox_tts",
         "sample_rate": 24000,
@@ -279,11 +282,19 @@ AVAILABLE_CHATTERBOX_MODELS: Dict[str, Dict[str, Any]] = {
 
 # ── Pack names ───────────────────────────────────────────────────────
 #
-# Upstream renamed a pack; this repository keeps the old spelling alive as
-# an alias, because a saved workflow carries the name it was saved with and
-# has to keep working. An alias is accepted everywhere a pack name is read
-# and offered nowhere: the dropdown lists the current name only.
-PACK_ALIASES: Dict[str, str] = {"chatterbox-turbo-nano": "chatterbox-nano"}
+# A pack's name changed under us twice, and both times the old spelling has
+# to stay readable or a saved workflow stops queueing: a graph carries the
+# name it was saved with. Upstream renamed one Turbo-family member, and the
+# classic pack's dropdown entry moved from this repository's internal id to
+# the name upstream publishes. Each old spelling is therefore kept alive as
+# an alias, and an alias is accepted everywhere a pack name is read -- and
+# offered nowhere: the dropdown lists the current name only, and a directory
+# on disk that still carries an alias is offered under the name that alias
+# maps to.
+PACK_ALIASES: Dict[str, str] = {
+    "chatterbox-turbo-nano": "chatterbox-nano",
+    "resembleai_default_voice": "chatterbox",
+}
 
 
 def canonical_pack_name(name: str) -> str:
@@ -294,6 +305,20 @@ def canonical_pack_name(name: str) -> str:
     pack of its own.
     """
     return PACK_ALIASES.get(name, name)
+
+
+def pack_spellings(canonical: str) -> set:
+    """``canonical`` plus every alias still mapping to it.
+
+    Used to answer "is this directory the one the canonical pack lives in?"
+    across a rename, where the folder on disk can still carry the old id -- and
+    to read from rather than hard-code a second copy of the legacy spelling.
+    """
+    spellings = {canonical}
+    spellings.update(
+        alias for alias, target in PACK_ALIASES.items() if target == canonical
+    )
+    return spellings
 
 
 def official_pack_names() -> List[str]:
@@ -489,13 +514,19 @@ def pack_dir_entries(pack_dir: str) -> List[tuple]:
     synthesized name is the user's handle for the variant; the folder stays
     a single copy of the shared weights.
 
-    Only the synthesized name is canonicalised: it is a name this module
-    mints, not one a directory owns. A directory keeps the name it has --
-    rewriting it would break the name/path pairing the loader resolves by.
+    The base name is canonicalised for the same reason the synthesized one
+    is: both are names this module mints for the dropdown, and the dropdown
+    must never show a spelling that resolves to another pack. A directory
+    still carrying a pack's old id is therefore offered under the name that
+    pack carries now -- which is what keeps an existing install working
+    rather than showing a pack nobody else in the repository knows. The
+    name/path pairing still holds because :func:`canonical_pack_name` only
+    rewrites the *name*: every entry minted here points at the very
+    directory it was minted from, alias-named or not.
     """
     if not pack_dir or not os.path.isdir(pack_dir):
         return []
-    base = os.path.basename(os.path.normpath(pack_dir))
+    base = canonical_pack_name(os.path.basename(os.path.normpath(pack_dir)))
     entries = set(_list_entries(pack_dir))
     has_turbo = "t3_turbo_v1.safetensors" in entries
     has_nano = "t3_nano_v1.safetensors" in entries
@@ -514,12 +545,16 @@ def describe_model_dir(model_dir: str) -> Dict[str, Any]:
     otherwise infers the architecture from the weight filenames. Returns a dict
     with ``name``, ``architecture`` and ``path``; ``architecture`` is
     ``"unknown"`` when neither source says anything.
+
+    ``name`` is the canonical name, because it becomes a registry key
+    (:func:`register_local_model`) and a dropdown entry, and neither may carry
+    a spelling that resolves to a *different* pack.
     """
     entries = _list_entries(model_dir)
     config = read_model_config(model_dir) or {}
     architecture = config.get("architecture") or _infer_architecture(entries) or "unknown"
     description: Dict[str, Any] = {
-        "name": os.path.basename(os.path.normpath(model_dir)),
+        "name": canonical_pack_name(os.path.basename(os.path.normpath(model_dir))),
         "architecture": architecture,
         "path": model_dir,
     }
@@ -662,12 +697,20 @@ def _is_official_variant_of(path: str, entry_name: str) -> bool:
     entry of its own, naming the same folder. Registering the local copy
     would replace that official entry (dropping its ``repo_id`` and its
     download target), and the next sweep would delete the name outright.
+
+    A directory still carrying a pack's **old** spelling is the same case,
+    which is why the folder is matched against every spelling of the entry
+    and not just its current one: the folder named after the old id *is* the
+    canonical pack's directory, and the official entry is the one that knows
+    the repository and the download target.
     """
     config = MODEL_CONFIGS.get(entry_name)
     if not config:
         return False
     folder = config.get("folder")
-    return bool(folder) and folder == os.path.basename(os.path.normpath(path))
+    if folder:
+        return folder == os.path.basename(os.path.normpath(path))
+    return os.path.basename(os.path.normpath(path)) in pack_spellings(entry_name)
 
 
 def refresh_local_models() -> List[dict]:
@@ -681,6 +724,8 @@ def refresh_local_models() -> List[dict]:
     :func:`pack_dir_entries` offers -- except the member that has an official
     entry of its own for that very folder: there the official entry stays,
     because it is the one that knows the repository and the download target.
+    The same holds for a folder still named after a pack's old id: it is the
+    canonical pack's directory, so the official entry survives it too.
     """
     from . import model_discovery
 

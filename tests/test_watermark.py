@@ -251,8 +251,9 @@ def test_repo_entry_point_no_longer_injects_a_perth_stub() -> None:
         "the perth stub is still injected into sys.modules; patch the source "
         "instead (src/PATCHES.md P-023..P-026)"
     )
-    assert "ensure_vendor_on_path()" in source, (
-        "the entry point no longer registers the vendored src/ at all"
+    assert "ensure_vendor_on_path" not in source and "vendor_loader" not in source, (
+        "the entry point must not publish the vendored src/ as a top-level "
+        "import root; the tree is imported package-relatively"
     )
 
 

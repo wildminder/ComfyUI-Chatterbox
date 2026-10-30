@@ -8,8 +8,8 @@ repository's entry points and fails on any Python file nothing reaches.
 Scope and known gaps, stated rather than hidden:
 
 * ``src/chatterbox/**`` is **excluded**. It is the vendored upstream package:
-  imported by absolute name (``chatterbox.tts``) through ``sys.path``, mocked
-  wholesale during collection, and deliberately free of ComfyUI-API awareness.
+  imported package-relatively (``..src.chatterbox.tts``), mocked wholesale
+  during collection, and deliberately free of ComfyUI-API awareness.
   Its integrity is asserted elsewhere, by content.
 * Package ``__init__.py`` files are treated as roots. Python's import
   machinery loads them implicitly as the parent of any submodule, so they are
@@ -31,8 +31,8 @@ from conftest import ROOT_DIR, PKG_ALIAS
 
 # Paths relative to the repository root that are never scanned.
 EXCLUDED_PREFIXES: tuple[str, ...] = (
-    "src/chatterbox/",  # vendored upstream; imported as `chatterbox.*`
-    "src/chatterbox_flash/",  # vendored Flash sampler; imported as `chatterbox_flash.*`
+    "src/chatterbox/",  # vendored upstream; imported as `..src.chatterbox.*`
+    "src/chatterbox_flash/",  # vendored Flash sampler; imported as `..src.chatterbox_flash.*`
     "tests/",  # the test suite itself, and its helpers
 )
 
@@ -87,8 +87,8 @@ def _iter_python_files() -> list[str]:
 
 
 def _module_name(relative: str) -> str:
-    """Dotted name of ``relative``, e.g. ``modules/vendor_loader.py`` ->
-    ``modules.vendor_loader``; ``src/hf_progress/__init__.py`` ->
+    """Dotted name of ``relative``, e.g. ``modules/loader.py`` ->
+    ``modules.loader``; ``src/hf_progress/__init__.py`` ->
     ``src.hf_progress``."""
     parts = relative[:-3].split("/")
     if parts[-1] == "__init__":
@@ -275,12 +275,12 @@ class TestNoDeadModules:
         )
         assert "src/hf_progress/__init__.py" not in EXCLUDED_PREFIXES
 
-    def test_entry_point_reaches_the_vendor_loader(self, graph: dict) -> None:
+    def test_entry_point_reaches_a_real_module(self, graph: dict) -> None:
         """Sanity: a real import edge exists, so the walk is not vacuous."""
         assert graph["reached"] >= set(graph["roots"])
         imports = graph["imports"]["__init__.py"]
-        assert any("vendor_loader" in name for name in imports), (
-            "the entry point must import modules/vendor_loader.py; "
+        assert any("chatterbox_nodes" in name for name in imports), (
+            "the entry point must import chatterbox_nodes.py; "
             f"it imports {sorted(imports)}"
         )
 

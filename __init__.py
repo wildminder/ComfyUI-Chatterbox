@@ -16,14 +16,11 @@ What happens here, in order, each step degrading rather than raising:
    relative imports below would die with "attempted relative import with no
    known parent package" before a single test runs. Under pytest the module
    therefore exports nothing and returns.
-2. **Vendor path.** ``src/`` is appended (never inserted) to ``sys.path`` so the
-   vendored ``chatterbox`` package resolves, and a pip-installed one still
-   wins.
-3. **Folder registration.** ``tts`` and ``chatterbox`` are registered with
+2. **Folder registration.** ``tts`` and ``chatterbox`` are registered with
    ComfyUI's ``folder_paths`` so voice packs are discoverable.
-4. **Model discovery.** The pack directory is scanned once so the dropdowns are
+3. **Model discovery.** The pack directory is scanned once so the dropdowns are
    populated on the first request instead of the first click.
-5. **Routes.** The ``/chatterbox/*`` API is registered when a ``PromptServer``
+4. **Routes.** The ``/chatterbox/*`` API is registered when a ``PromptServer``
    is available. A headless or test process has none, and that is not an error.
 """
 
@@ -42,7 +39,6 @@ else:
     from .modules.api_routes import register_routes
     from .modules.folder_registration import register_chatterbox_folders
     from .modules.model_discovery import get_chatterbox_model_pack_names
-    from .modules.vendor_loader import ensure_vendor_on_path
 
     # Declared with the bootstrap, never above the pytest guard: the guard is
     # what makes this module importable during collection, and a web directory
@@ -51,20 +47,17 @@ else:
     # finds at /extensions/ComfyUI-Chatterbox/.
     WEB_DIRECTORY = "./js"
 
-    # 1. The vendored `chatterbox` package lives in this repository's `src/`.
-    ensure_vendor_on_path()
-
-    # 2. Where voice packs are looked for: `models/tts/chatterbox`.
+    # 1. Where voice packs are looked for: `models/tts/chatterbox`.
     register_chatterbox_folders(folder_paths)
 
-    # 3. One scan now, so the pack dropdown is populated on the frontend's first
+    # 2. One scan now, so the pack dropdown is populated on the frontend's first
     #    `/object_info` request instead of its first click.
     logging.debug(
         "[Chatterbox TTS] Found %d Chatterbox voice pack(s).",
         len(get_chatterbox_model_pack_names()),
     )
 
-    # 4. The `/chatterbox/*` API. Only a running server has a `PromptServer`;
+    # 3. The `/chatterbox/*` API. Only a running server has a `PromptServer`;
     #    a headless or partially-booted process simply gets no routes.
     try:
         from server import PromptServer

@@ -43,7 +43,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 import torch
-from chatterbox.models.dsp import resample as dsp_resample
+from ...chatterbox.models.dsp import resample as dsp_resample
 from tqdm import tqdm
 
 try:

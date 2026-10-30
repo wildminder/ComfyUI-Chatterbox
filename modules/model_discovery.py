@@ -89,10 +89,19 @@ def _scan(root: str) -> List[Tuple[str, str]]:
     Every subdirectory counts as a pack: a partially downloaded one must stay
     selectable so the download can finish it. The reserved shared-weight
     store (``SHARED_ASSET_DIR_NAME``) is not a pack and never appears.
-    """
-    from .model_info import SHARED_ASSET_DIR_NAME
 
-    packs: List[Tuple[str, str]] = []
+    Each directory is offered under its **canonical** name, because the combo
+    may only show names that resolve: a folder still carrying a pack's old id
+    is the pack it now names, and showing two spellings of one pack would
+    offer a value nothing else in the repository accepts. When a canonical
+    directory and a legacy one both exist the canonical directory wins, so
+    the pick always reads the same as the folder it loaded -- the legacy
+    folder stays loadable, but as the fallback :func:`get_model_pack_path`
+    resolves rather than as a rival entry.
+    """
+    from .model_info import SHARED_ASSET_DIR_NAME, canonical_pack_name
+
+    packs: Dict[str, Tuple[str, str]] = {}
     try:
         with os.scandir(root) as entries:
             for entry in entries:
@@ -100,7 +109,10 @@ def _scan(root: str) -> List[Tuple[str, str]]:
                     if entry.name == SHARED_ASSET_DIR_NAME:
                         continue
                     if entry.is_dir():
-                        packs.append((entry.name, entry.path))
+                        name = canonical_pack_name(entry.name)
+                        if name in packs and entry.name != name:
+                            continue
+                        packs[name] = (name, entry.path)
                 except OSError as exc:
                     # A pack deleted mid-scan is not a reason to lose the rest.
                     logging.debug(
@@ -115,13 +127,13 @@ def _scan(root: str) -> List[Tuple[str, str]]:
     # Sort by name, then hoist the default pack so a freshly saved workflow
     # that carries no widget value lands on the official voice rather than
     # whatever sorts first alphabetically.
-    packs.sort(key=lambda pair: pair[0])
-    for index, (name, _path) in enumerate(packs):
+    found = sorted(packs.values(), key=lambda pair: pair[0])
+    for index, (name, _path) in enumerate(found):
         if name == DEFAULT_MODEL_PACK_NAME:
-            default_pack = packs.pop(index)
-            packs.insert(0, default_pack)
+            default_pack = found.pop(index)
+            found.insert(0, default_pack)
             break
-    return packs
+    return found
 
 
 def get_model_pack_entries() -> List[Tuple[str, str]]:
@@ -133,6 +145,10 @@ def get_model_pack_entries() -> List[Tuple[str, str]]:
     The rule (and the name) live in
     :func:`modules.model_info.pack_dir_entries`; this pass only borrows the
     names, and skips a synthesized name that a real directory already owns.
+
+    Every name here is canonical: a directory carrying a renamed pack's old
+    spelling is listed under the name that pack now has, against its own
+    path. Nothing above this pass needs to know the folder was renamed.
     """
     from .model_info import pack_dir_entries
 
@@ -201,15 +217,30 @@ def get_chatterbox_model_pack_names() -> List[str]:
 
 
 def get_model_pack_path(model_pack_name: Optional[str]) -> Optional[str]:
-    """Absolute path of ``model_pack_name``, or ``None`` for a blank name.
+    """The directory ``model_pack_name`` lives in -- or should be downloaded into.
 
     ``None`` for empty input is deliberate: a saved workflow can carry an
     empty combo value, and the loader turns ``None`` into a clear message
     instead of resolving to the models root and loading the wrong thing.
+
+    The name is canonicalised first, so an old spelling asks about the very
+    directory the current name asks about. The answer comes from the cached
+    scan, which is what makes an **existing install** keep working rather
+    than re-download 2.7 GB: a folder still carrying the old spelling is
+    listed under the canonical name against its own path, and that path is
+    what this hands back. A pack with no directory yet -- a fresh install, or
+    a pack the user has not chosen before -- resolves to the canonical path,
+    which is where a download puts it.
     """
     if not model_pack_name:
         return None
-    return os.path.join(get_models_root(), model_pack_name)
+    from .model_info import canonical_pack_name
+
+    name = canonical_pack_name(model_pack_name)
+    for entry_name, path in get_model_pack_entries():
+        if entry_name == name:
+            return path
+    return os.path.join(get_models_root(), name)
 
 
 def invalidate_cache() -> None:
