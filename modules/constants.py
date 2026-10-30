@@ -2,10 +2,20 @@
 
 These four values were defined in ``modules/chatterbox_handler.py``, deleted by
 S3.2, and are recorded in ``tests/frozen_widget_snapshot.json``. They are the
-compatibility contract: saved workflows were built against the default pack
-name and the on-disk layout under ``models/tts/chatterbox``, so neither may
-drift. ``tests/test_move_parity.py::TestCarriedForwardConstants`` compares this
+compatibility contract: saved workflows were built against the on-disk layout
+under ``models/tts/chatterbox`` and against the widget defaults recorded there,
+so neither may drift without that record being updated in the same commit.
+``tests/test_move_parity.py::TestCarriedForwardConstants`` compares this
 module against that record.
+
+The default pack *name* is the one entry that changed on purpose (2026-10-29):
+the combo used to offer an internal id, ``resembleai_default_voice``, where
+every other entry showed the name upstream publishes. It now reads
+``chatterbox``, and the old spelling is carried by
+:data:`modules.model_info.PACK_ALIASES`, which is what keeps a workflow saved
+with it resolving to the very same directory instead of failing to queue. The
+directory layout -- the half of the contract a user actually paid 2.7 GB for
+-- did not move.
 
 Nothing here imports ``folder_paths``, ``comfy.*`` or ``server``: it is a leaf
 module every other module may import from freely.
@@ -47,7 +57,11 @@ CHATTERBOX_FILES_TO_DOWNLOAD = [
 ]
 
 # The pack a saved workflow names when its combo widget carries no value.
-DEFAULT_MODEL_PACK_NAME = "resembleai_default_voice"
+# Spelled the way upstream spells the repository it comes from, so the
+# dropdown reads like the rest of the pack list. The old internal id is an
+# alias in ``modules.model_info.PACK_ALIASES``: an existing install keeps the
+# folder it has, and a workflow saved with the old spelling still resolves.
+DEFAULT_MODEL_PACK_NAME = "chatterbox"
 
 # ---------------------------------------------------------------------------
 # Multilingual (S8.1)

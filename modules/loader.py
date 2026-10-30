@@ -53,6 +53,7 @@ from .model_info import (
     SHARED_ASSET_FILES,
     canonical_pack_name,
     is_chatterbox_model_dir,
+    pack_spellings,
 )
 
 __all__ = [
@@ -102,7 +103,10 @@ MTL_S3GEN_CHECKPOINTS: tuple[str, ...] = (
 
 #: Pack folders that historically hold the shared repo's weights. Read-only
 #: search candidates for shared assets; downloads never write into them.
-LEGACY_SHARED_DIRS: tuple[str, ...] = ("chatterbox", DEFAULT_MODEL_PACK_NAME)
+#: Both spellings of the classic pack's folder: an install that predates the
+#: 2026-10-29 rename still has its copy under the old id, and those bytes
+#: are the ones to be found before fetching anything again.
+LEGACY_SHARED_DIRS: tuple[str, ...] = tuple(pack_spellings(DEFAULT_MODEL_PACK_NAME))
 
 #: Turbo and Nano share one layout, and so share one completeness list. The
 #: tokenizer is checked separately: both families publish the GPT2-style
@@ -511,7 +515,9 @@ class ChatterboxLoader:
 
         An alias resolves to the pack it now names: a workflow saved before a
         pack was renamed still finds (and downloads into) the same directory,
-        because the old spelling is answered from the canonical entry.
+        because the old spelling is answered from the canonical entry -- and
+        the canonical directory is the legacy folder when that is the only
+        one on disk, so an existing install is never asked to download again.
 
         Never raises for a missing directory: "not downloaded yet" is a normal
         state that the download step resolves, and a select-then-download flow
@@ -537,20 +543,11 @@ class ChatterboxLoader:
 
         # An official entry may download into a folder other than its own
         # name: the Turbo-family members share one directory, so the Nano
-        # entry's ``folder`` is ``chatterbox-turbo``.
+        # entry's ``folder`` is ``chatterbox-turbo``. A pack with no
+        # directory yet resolves to the canonical path, which is where the
+        # download step puts it.
         folder = str(entry.get("folder")) if entry and entry.get("folder") else name
-        known = get_model_pack_path(folder)
-        if known:
-            return known
-
-        if name == DEFAULT_MODEL_PACK_NAME:
-            # The default pack has no directory until something creates one;
-            # hand back the path it *would* live at.
-            from .model_discovery import get_models_root
-
-            return os.path.join(get_models_root(), DEFAULT_MODEL_PACK_NAME)
-
-        return str(get_model_pack_path(name) or name)
+        return str(get_model_pack_path(folder) or name)
 
     # -- completeness --------------------------------------------------
 
@@ -717,7 +714,12 @@ class ChatterboxLoader:
         _refuse_wrong_variant_pack(pack_dir, model_name, entry_point="classic")
 
         if not ChatterboxLoader.is_pack_complete(pack_dir):
-            entry = AVAILABLE_CHATTERBOX_MODELS.get(model_name) or {}
+            # Looked up by the *canonical* name: the widget value can be a
+            # spelling that predates a rename, and the old spelling has to
+            # find the repository the pack now downloads from -- otherwise the
+            # download step would be handed an empty repo and the missing-file
+            # error would name a pack that exists.
+            entry = ChatterboxLoader._registry_entry(model_name) or {}
             repo_id = str(entry.get("repo_id") or "")
             logging.info(
                 "[Chatterbox TTS] Voice pack '%s' is not complete at '%s'; "
