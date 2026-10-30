@@ -34,7 +34,7 @@ from ComfyUI_Chatterbox.modules.model_discovery import (
 #: that derives its expectation from the code under test proves nothing. A
 #: pack dropped from the table must fail here, not quietly follow the drop.
 OFFICIAL_PACK_NAMES = (
-    "resembleai_default_voice",
+    "chatterbox",
     "chatterbox-multilingual-zh-cmn",
     "chatterbox-multilingual-es-mx-latam",
     "chatterbox-multilingual-es-es",
@@ -156,7 +156,7 @@ class TestPackNames:
         assert get_chatterbox_model_pack_names() == list(OFFICIAL_PACK_NAMES)
 
     def test_the_names_are_the_frozen_default(self) -> None:
-        assert DEFAULT_MODEL_PACK_NAME == "resembleai_default_voice"
+        assert DEFAULT_MODEL_PACK_NAME == "chatterbox"
 
 
 # ---------------------------------------------------------------------------
@@ -585,7 +585,7 @@ class TestAnAbsentOfficialPackResolves:
     @pytest.mark.parametrize(
         "name,folder",
         [
-            ("resembleai_default_voice", "resembleai_default_voice"),
+            ("chatterbox", "chatterbox"),
             ("chatterbox-multilingual-zh-cmn", "chatterbox-multilingual-zh-cmn"),
             ("chatterbox-multilingual-es-mx-latam", "chatterbox-multilingual-es-mx-latam"),
             ("chatterbox-multilingual-es-es", "chatterbox-multilingual-es-es"),

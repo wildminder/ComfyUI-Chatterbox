@@ -284,10 +284,10 @@ class TestModelsRoute:
         default_voice = next(
             entry
             for entry in response.payload["models"]
-            if entry["name"] == "resembleai_default_voice"
+            if entry["name"] == "chatterbox"
         )
         assert default_voice["type"] == "official"
-        assert default_voice["repo_id"] == MODEL_CONFIGS["resembleai_default_voice"]["repo_id"]
+        assert default_voice["repo_id"] == MODEL_CONFIGS["chatterbox"]["repo_id"]
         assert default_voice["architecture"] == "chatterbox_tts"
         assert default_voice["sample_rate"] == 24000
         assert default_voice["is_downloaded"] is False
@@ -642,7 +642,7 @@ class TestRegisterModelPath:
         response = self._register(router, str(root))
 
         assert [model["name"] for model in response.payload["models"]] == [
-            "resembleai_default_voice"
+            "chatterbox"
         ]
 
     def test_discovered_packs_land_in_the_registry(

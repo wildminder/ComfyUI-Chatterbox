@@ -35,7 +35,7 @@ WORKFLOW_PATH = os.path.join(ROOT_DIR, "example_workflows", "ChatterboxTTS-workf
 
 # (name, type, default, min, max, step, control_after_generate)
 TTS_REQUIRED: tuple[tuple, ...] = (
-    ("model_pack_name", "COMBO", "resembleai_default_voice", None, None, None, False),
+    ("model_pack_name", "COMBO", "chatterbox", None, None, None, False),
     ("text", "STRING", "Hello, this is a test of Chatterbox TTS in ComfyUI.", None, None, None, False),
     ("max_new_tokens", "INT", 1000, 16, 4000, 8, False),
     ("flow_cfg_scale", "FLOAT", 0.7, 0.0, 2.0, 0.05, False),
@@ -50,7 +50,7 @@ TTS_REQUIRED: tuple[tuple, ...] = (
 )
 
 VC_REQUIRED: tuple[tuple, ...] = (
-    ("model_pack_name", "COMBO", "resembleai_default_voice", None, None, None, False),
+    ("model_pack_name", "COMBO", "chatterbox", None, None, None, False),
     ("source_audio", "AUDIO", None, None, None, None, False),
     ("n_timesteps", "INT", 10, 2, 50, 1, False),
     ("temperature", "FLOAT", 1.0, 0.0, 2.0, 0.05, False),
@@ -263,7 +263,7 @@ class TestCarriedForwardConstants:
             "tokenizer.json",
             "conds.pt",
         ],
-        "DEFAULT_MODEL_PACK_NAME": "resembleai_default_voice",
+        "DEFAULT_MODEL_PACK_NAME": "chatterbox",
     }
 
     def test_all_four_constants_are_recorded(self, snapshot: dict) -> None:
@@ -285,7 +285,7 @@ class TestCarriedForwardConstants:
 
     def test_default_pack_name_is_the_only_official_voice(self, snapshot: dict) -> None:
         default = snapshot["constants"]["DEFAULT_MODEL_PACK_NAME"]["value"]
-        assert default == "resembleai_default_voice"
+        assert default == "chatterbox"
         assert default in {
             entry["default"]
             for node in snapshot["nodes"].values()

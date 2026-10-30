@@ -1,18 +1,18 @@
 """The pack alias: the old spelling still resolves, the dropdown shows the new one.
 
-Upstream renamed a pack. A saved workflow carries the name it was saved with,
-so the old spelling has to keep working -- but the dropdown may only offer the
-current name, or the user is handed a spelling nothing else in the repository
-uses.
+Two packs were renamed under this repository, and both old spellings have to
+keep working while the dropdown may only offer the current name -- or the user
+is handed a spelling nothing else in the repository uses, and a workflow that
+saved fine yesterday refuses to queue today.
 
 That means the alias has to be resolved at **every** seam a pack name reaches:
 the loader's path resolution, the registry entry, the Turbo-variant answer,
 the API's presence check and the nodes' queue-time validation. A seam that
 forgets the alias turns a renamed pack into a broken one exactly where the
-user notices: a workflow that saved fine yesterday and refuses to queue today.
+user notices.
 
-The old spelling is written out here on purpose: this file and the alias
-table itself are the only two places allowed to name it.
+The old spellings are written out here on purpose: this file and the alias
+table itself are the only two places allowed to name them.
 """
 
 from __future__ import annotations
@@ -24,23 +24,39 @@ import torch
 
 from ComfyUI_Chatterbox.modules import api_routes, model_info
 from ComfyUI_Chatterbox.modules import generation as gen
+from ComfyUI_Chatterbox.modules.constants import CHATTERBOX_REPO_ID
 from ComfyUI_Chatterbox.modules.folder_registration import TTS_FOLDER_KEY
 from ComfyUI_Chatterbox.modules.generation import FAMILY_TURBO, _resolve_turbo_variant
 from ComfyUI_Chatterbox.modules.loader import ChatterboxLoader, _registry_size_estimate
 from ComfyUI_Chatterbox.modules.model_discovery import (
     get_chatterbox_model_pack_names,
+    get_model_pack_entries,
+    get_model_pack_path,
     invalidate_cache,
 )
 from ComfyUI_Chatterbox.modules.model_info import (
     AVAILABLE_CHATTERBOX_MODELS,
     MODEL_CONFIGS,
     canonical_pack_name,
+    official_pack_names,
 )
 
 #: The spelling upstream used before the rename.
 OLD_NAME = "chatterbox-turbo-nano"
 #: The spelling upstream uses now.
 NEW_NAME = "chatterbox-nano"
+
+#: The spelling this repository's internal id gave the classic pack before the
+#: 2026-10-29 rename. It is also the **folder name** an existing install has
+#: on disk, which is the half of the rename a user actually paid for.
+OLD_CLASSIC_NAME = "resembleai_default_voice"
+#: The name upstream publishes, and the one the combo offers now.
+NEW_CLASSIC_NAME = "chatterbox"
+
+#: What a classic pack directory holds. Nothing here is a real weight: the
+#: point is the shape the sniffers recognise, and the one file (``conds.pt``)
+#: the classic pack ships alone.
+CLASSIC_PACK_FILES = ("tokenizer.json", "t3_cfg.safetensors", "conds.pt")
 
 
 # ── Doubles ──────────────────────────────────────────────────────────
@@ -377,3 +393,219 @@ class TestTheQueueTimeValidation:
 
         assert message is not None
         assert "no_such_pack" in message
+
+
+# ── The classic pack's rename (2026-10-29) ────────────────────────────
+
+
+class TestTheClassicPackRename:
+    """The classic pack's dropdown entry was an internal id; the folder on
+    disk carries that id too, on installs that predate the rename.
+
+    The name moved to the one upstream publishes, so the acceptance criteria
+    here are about the *name* (offered, default, resolved) and never about the
+    bytes: a user who downloaded 2.7 GB under the old folder name must not be
+    asked to download them again.
+    """
+
+    # -- R1: never offered --------------------------------------------
+
+    def test_the_legacy_spelling_is_not_offered(self, models_root) -> None:
+        assert OLD_CLASSIC_NAME not in get_chatterbox_model_pack_names()
+
+    def test_the_legacy_spelling_is_not_a_pack_of_its_own(self) -> None:
+        assert OLD_CLASSIC_NAME not in MODEL_CONFIGS
+        assert OLD_CLASSIC_NAME not in official_pack_names()
+
+    def test_the_legacy_spelling_is_not_in_the_registry(self) -> None:
+        assert OLD_CLASSIC_NAME not in AVAILABLE_CHATTERBOX_MODELS
+
+    # -- R2: always offered, first, as the default --------------------
+
+    def test_the_canonical_name_is_offered(self, models_root) -> None:
+        assert NEW_CLASSIC_NAME in get_chatterbox_model_pack_names()
+
+    def test_the_canonical_name_is_the_first_entry(self, models_root) -> None:
+        """Index 0 is the combo's default: a freshly saved workflow that
+        carries no widget value has to land on the classic voice, not on
+        whatever a third-party folder sorts first alphabetically."""
+        assert get_chatterbox_model_pack_names()[0] == NEW_CLASSIC_NAME
+
+    def test_the_default_is_the_canonical_name(self) -> None:
+        from ComfyUI_Chatterbox.modules.constants import DEFAULT_MODEL_PACK_NAME
+
+        assert DEFAULT_MODEL_PACK_NAME == NEW_CLASSIC_NAME
+
+    # -- R3: a legacy directory is the canonical pack -----------------
+
+    def test_a_legacy_directory_is_offered_under_the_canonical_name(
+        self, models_root
+    ) -> None:
+        legacy = make_pack(models_root / OLD_CLASSIC_NAME, CLASSIC_PACK_FILES)
+
+        entries = dict(get_model_pack_entries())
+        names = get_chatterbox_model_pack_names()
+
+        assert entries[NEW_CLASSIC_NAME] == str(legacy)
+        assert NEW_CLASSIC_NAME in names
+        assert OLD_CLASSIC_NAME not in names
+
+    def test_the_canonical_directory_wins_over_the_legacy_one(
+        self, models_root
+    ) -> None:
+        canonical = make_pack(models_root / NEW_CLASSIC_NAME, CLASSIC_PACK_FILES)
+        make_pack(models_root / OLD_CLASSIC_NAME, CLASSIC_PACK_FILES)
+
+        entries = dict(get_model_pack_entries())
+
+        assert entries[NEW_CLASSIC_NAME] == str(canonical)
+
+    def test_the_scanned_legacy_directory_registers_nothing_local(
+        self, models_root, registry
+    ) -> None:
+        """The official entry is the one that knows the repository and the
+        download target; a folder that still carries the old id does not
+        demote it."""
+        make_pack(models_root / OLD_CLASSIC_NAME, CLASSIC_PACK_FILES)
+
+        model_info.refresh_local_models()
+
+        assert registry[NEW_CLASSIC_NAME]["type"] == "official"
+
+    def test_the_api_reports_the_legacy_folder_as_downloaded(
+        self, models_root, registry
+    ) -> None:
+        """The presence check has to probe the folder the weights are in, not
+        just the one the new spelling implies -- otherwise the download UI
+        tells a user who already has all 2.7 GB that they do not, and offers
+        them the download again."""
+        config = MODEL_CONFIGS[NEW_CLASSIC_NAME]
+        make_pack(models_root / OLD_CLASSIC_NAME, config["files"])
+        folder_paths = FakeFolderPaths([str(models_root.parent)])
+
+        assert (
+            api_routes._is_official_pack_present(
+                NEW_CLASSIC_NAME, config, folder_paths
+            )
+            is True
+        )
+
+    def test_the_api_reports_the_canonical_folder_as_downloaded(
+        self, models_root, registry
+    ) -> None:
+        """And the current name's own folder still answers True, so a machine
+        holding both reports the canonical one."""
+        config = MODEL_CONFIGS[NEW_CLASSIC_NAME]
+        make_pack(models_root / NEW_CLASSIC_NAME, config["files"])
+        make_pack(models_root / OLD_CLASSIC_NAME, config["files"])
+        folder_paths = FakeFolderPaths([str(models_root.parent)])
+
+        assert (
+            api_routes._is_official_pack_present(
+                NEW_CLASSIC_NAME, config, folder_paths
+            )
+            is True
+        )
+
+    def test_the_api_still_reports_a_missing_pack_as_absent(self, models_root) -> None:
+        """The probe may not become a rubber stamp: a folder that holds the old
+        id but no weights is still not a downloaded pack."""
+        config = MODEL_CONFIGS[NEW_CLASSIC_NAME]
+        make_pack(models_root / OLD_CLASSIC_NAME, ())
+        folder_paths = FakeFolderPaths([str(models_root.parent)])
+
+        assert (
+            api_routes._is_official_pack_present(
+                NEW_CLASSIC_NAME, config, folder_paths
+            )
+            is False
+        )
+
+    # -- R4: the path falls back to the legacy directory --------------
+
+    def test_the_path_falls_back_to_the_legacy_directory(self, models_root) -> None:
+        legacy = make_pack(models_root / OLD_CLASSIC_NAME, CLASSIC_PACK_FILES)
+
+        assert get_model_pack_path(NEW_CLASSIC_NAME) == str(legacy)
+
+    def test_the_canonical_directory_is_preferred_for_the_path(
+        self, models_root
+    ) -> None:
+        canonical = make_pack(models_root / NEW_CLASSIC_NAME, CLASSIC_PACK_FILES)
+        make_pack(models_root / OLD_CLASSIC_NAME, CLASSIC_PACK_FILES)
+
+        assert get_model_pack_path(NEW_CLASSIC_NAME) == str(canonical)
+
+    def test_a_pack_with_no_directory_resolves_to_where_it_will_download(
+        self, models_root
+    ) -> None:
+        assert get_model_pack_path(NEW_CLASSIC_NAME) == str(
+            models_root / NEW_CLASSIC_NAME
+        )
+
+    def test_a_blank_name_still_returns_none(self) -> None:
+        assert get_model_pack_path("") is None
+
+    # -- R5: both spellings canonicalise ------------------------------
+
+    def test_the_legacy_spelling_canonicalises(self) -> None:
+        assert canonical_pack_name(OLD_CLASSIC_NAME) == NEW_CLASSIC_NAME
+
+    def test_the_current_name_is_its_own_canonical_name(self) -> None:
+        assert canonical_pack_name(NEW_CLASSIC_NAME) == NEW_CLASSIC_NAME
+
+    # -- R6: the loader resolves both spellings to one directory -------
+
+    def test_the_legacy_widget_value_resolves_to_the_same_directory(
+        self, models_root, registry
+    ) -> None:
+        legacy = make_pack(models_root / OLD_CLASSIC_NAME, CLASSIC_PACK_FILES)
+
+        assert ChatterboxLoader.resolve_pack_dir(OLD_CLASSIC_NAME) == (
+            ChatterboxLoader.resolve_pack_dir(NEW_CLASSIC_NAME)
+        )
+        assert ChatterboxLoader.resolve_pack_dir(OLD_CLASSIC_NAME) == str(legacy)
+
+    def test_a_fresh_install_resolves_both_spellings_to_the_download_folder(
+        self, models_root, registry
+    ) -> None:
+        assert ChatterboxLoader.resolve_pack_dir(OLD_CLASSIC_NAME) == str(
+            models_root / NEW_CLASSIC_NAME
+        )
+
+    def test_the_legacy_widget_value_still_finds_the_repository(
+        self, models_root, registry, monkeypatch
+    ) -> None:
+        """Seam the plan calls out: the download step reads the registry by
+        the *canonical* name. Looking the raw widget value up would answer
+        with an empty entry, the fetch would target no repository at all, and
+        the pack would be reported as missing rather than as not yet
+        downloaded."""
+        attempts: list[tuple] = []
+
+        def record_download(model_name, repo_id, local_dir, client_id=None, allow_patterns=None):
+            attempts.append((model_name, repo_id, str(local_dir)))
+
+        monkeypatch.setattr(
+            ChatterboxLoader, "download_pack", staticmethod(record_download)
+        )
+        monkeypatch.setattr(
+            ChatterboxLoader, "_ensure_shared_assets", staticmethod(lambda *a, **k: None)
+        )
+
+        empty = models_root / "half_downloaded"
+        empty.mkdir()
+        with pytest.raises(FileNotFoundError, match="not available at"):
+            ChatterboxLoader.load_model(
+                OLD_CLASSIC_NAME, torch.device("cpu"), model_path=str(empty), load_vc=False
+            )
+
+        assert (OLD_CLASSIC_NAME, CHATTERBOX_REPO_ID, str(empty)) in attempts
+
+    def test_the_legacy_widget_value_is_measured_against_the_classic_entry(
+        self, models_root, registry
+    ) -> None:
+        assert _registry_size_estimate(OLD_CLASSIC_NAME) == (
+            _registry_size_estimate(NEW_CLASSIC_NAME)
+        )
+        assert _registry_size_estimate(OLD_CLASSIC_NAME) == int(2.7 * (1024**3))
