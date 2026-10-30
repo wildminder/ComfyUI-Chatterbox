@@ -268,7 +268,7 @@ class TestPyprojectMetadata:
         """S9.3 landed the release bump; the cross-file sync lives in
         ``tests/test_version_sync.py``, which also compares against the
         changelog's top heading."""
-        assert project(pyproject)["version"] == "2.0.0"
+        assert project(pyproject)["version"] == "2.0.6"
 
     def test_repository_url_is_preserved(self, pyproject: dict) -> None:
         assert project(pyproject)["urls"]["Repository"].endswith("ComfyUI-Chatterbox")

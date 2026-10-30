@@ -5,6 +5,12 @@ All notable changes to ComfyUI-Chatterbox are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.6] - 2026-10-31
+
+### Fixed
+
+- The classic voice pack is offered as `chatterbox` in the model dropdown; the internal id `resembleai_default_voice` is still accepted, so a workflow saved with it keeps loading.
+
 ## [2.0.5] - 2026-10-23
 
 The release in which the models speak like the script asks. Everything below

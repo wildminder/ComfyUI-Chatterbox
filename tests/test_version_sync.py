@@ -107,8 +107,8 @@ class TestChangelogShape:
 
 class TestVersionSync:
     def test_pyproject_version_is_the_release_version(self, pyproject_version) -> None:
-        """S9.3 bumped 1.2.1 -> 2.0.0. A structural break, not a feature drop."""
-        assert pyproject_version == "2.0.0"
+        """S9.3 bumped 1.2.1 -> 2.0.6. A structural break, not a feature drop."""
+        assert pyproject_version == "2.0.6"
 
     def test_the_pyproject_and_the_changelog_cannot_drift(self, pyproject_version, headings) -> None:
         """The contract, restated with the failure spelled out.
