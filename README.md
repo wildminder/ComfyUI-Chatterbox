@@ -82,8 +82,14 @@ from upstream's own packs, fetched on first run:
 
 | Pick | Upstream pack | Folder under `models/tts/chatterbox/` |
 | :--- | :--- | :--- |
+| `chatterbox` | [`ResembleAI/chatterbox`](https://huggingface.co/ResembleAI/chatterbox) | `chatterbox` |
 | `chatterbox-turbo` | [`ResembleAI/chatterbox-turbo`](https://huggingface.co/ResembleAI/chatterbox-turbo) | `chatterbox-turbo` |
 | `chatterbox-nano` | [`ResembleAI/chatterbox-nano`](https://huggingface.co/ResembleAI/chatterbox-nano) | `chatterbox-turbo` (shared with Turbo) |
+
+The Single Language Packs (`chatterbox-multilingual-*`) live in a folder of
+their own, named after the pack. An install that predates the rename keeps
+its classic pack in a folder named `resembleai_default_voice`: it still loads,
+and the dropdown offers it as `chatterbox` either way.
 
 Turbo and Nano are one family with two `t3` checkpoints: the folder is shared,
 the dropdown entry -- not the folder -- picks the weights.
